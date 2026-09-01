@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useTheme } from "@/app/context/ThemeContext";
+import { useTheme, ThemeProvider } from "@/app/context/ThemeContext";
 import { useWrapStore } from "@/app/store/wrapStore";
 import Link from "next/link";
 
@@ -20,7 +20,21 @@ const ArchetypeIcon = ({ name }: { name: string }) => {
   return <span className="text-4xl">{icons[name] || "🎭"}</span>;
 };
 
+// This route lives outside app/[locale], so app/[locale]/layout.tsx's
+// ThemeProvider never wraps it (the only other layout, root app/layout.tsx,
+// deliberately renders no providers to avoid nested <html> tags with the
+// locale layout). Providing ThemeProvider locally here is the safe, scoped
+// fix — restructuring the shared layouts risks breaking the working
+// [locale] tree.
 export default function HistoryPage() {
+  return (
+    <ThemeProvider>
+      <HistoryPageContent />
+    </ThemeProvider>
+  );
+}
+
+function HistoryPageContent() {
   const { mode } = useTheme();
   const { address } = useWrapStore();
 

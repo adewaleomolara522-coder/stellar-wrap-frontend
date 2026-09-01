@@ -6,6 +6,9 @@
 
 import type { CacheEntry } from "./indexer";
 import { CACHE_VERSION } from "./indexer";
+import { logger } from "./logger";
+
+const log = logger.child("IndexedDbCache");
 
 const DB_NAME = "stellar-wrap-cache";
 const STORE_NAME = "indexedData";
@@ -72,7 +75,7 @@ export async function getCacheEntry(key: string): Promise<CacheEntry | null> {
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
-    console.warn("[IndexedDB cache] getCacheEntry failed:", error);
+    log.warn("getCacheEntry failed:", error);
     return null;
   }
 }
@@ -102,7 +105,7 @@ export async function setCacheEntry(
 
     await evictIfOverLimit(db);
   } catch (error) {
-    console.warn("[IndexedDB cache] setCacheEntry failed:", error);
+    log.warn("setCacheEntry failed:", error);
     try {
       closeCacheDB();
     } catch {
@@ -125,7 +128,7 @@ export async function invalidateCache(key: string): Promise<void> {
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
-    console.warn("[IndexedDB cache] invalidateCache failed:", error);
+    log.warn("invalidateCache failed:", error);
   }
 }
 
@@ -143,7 +146,7 @@ export async function clearCache(): Promise<void> {
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
-    console.warn("[IndexedDB cache] clearCache failed:", error);
+    log.warn("clearCache failed:", error);
   } finally {
     closeCacheDB();
   }
@@ -180,7 +183,7 @@ export async function getAllCacheEntries(): Promise<StoredCacheRecord[]> {
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
-    console.warn("[IndexedDB cache] getAllCacheEntries failed:", error);
+    log.warn("getAllCacheEntries failed:", error);
     return [];
   }
 }

@@ -14,7 +14,15 @@ import {
   PersistedIndexingState,
   IndexingMetrics,
 } from "@/app/types/indexing";
+import {
+  OptimisticNetworkSwitchState,
+  OptimisticNetworkSwitchActions,
+  NetworkSwitchFailureReason,
+} from "@/app/types/networkSwitch";
 import { horizonIndexer } from "@/src/services/horizonIndexer";
+import { logger } from "@/app/utils/logger";
+
+const log = logger.child("wrapStore");
 
 const PERSISTENCE_KEY = "stellar-wrap-indexing-state";
 const PERSISTENCE_TIMEOUT = 5 * 60 * 1000;
@@ -124,7 +132,18 @@ const initialIndexingState = {
   },
 };
 
-interface WrapStoreState {
+const initialOptimisticSwitchState: OptimisticNetworkSwitchState = {
+  phase: "idle",
+  previousNetwork: null,
+  optimisticNetwork: null,
+  switchError: null,
+  failureReason: null,
+  switchAttempt: 0,
+};
+
+interface WrapStoreState
+  extends OptimisticNetworkSwitchState,
+    OptimisticNetworkSwitchActions {
   address: string | null;
   period: WrapPeriod;
   network: Network;
@@ -136,6 +155,8 @@ interface WrapStoreState {
   contractAddresses: ContractAddressesByNetwork;
   refreshToken: number;
   isRefreshing: boolean;
+  assetList: string[];
+  setAssetList: (assets: string[]) => void;
   // Indexing state
   currentStep: IndexingStep | null;
   stepProgress: Record<IndexingStep, number>;
@@ -219,8 +240,11 @@ export const useWrapStore = create<WrapStoreState>()(
       contractAddresses: {},
       refreshToken: 0,
       isRefreshing: false,
+      assetList: [],
       // Indexing initial state
       ...initialIndexingState,
+      // Optimistic network switch initial state
+      ...initialOptimisticSwitchState,
       setAddress: (address) => set({ address }),
       setPeriod: (period) => set({ period }),
       setNetwork: (network) => {
@@ -246,6 +270,7 @@ export const useWrapStore = create<WrapStoreState>()(
       setCacheMeta: (cacheMeta) => set({ cacheMeta }),
       setContractAddresses: (contractAddresses) => set({ contractAddresses }),
       setRefreshing: (isRefreshing) => set({ isRefreshing }),
+      setAssetList: (assetList) => set({ assetList }),
       bumpRefreshToken: () => set((s) => ({ refreshToken: s.refreshToken + 1 })),
       reset: () =>
         set({
@@ -260,7 +285,9 @@ export const useWrapStore = create<WrapStoreState>()(
           contractAddresses: {},
           refreshToken: 0,
           isRefreshing: false,
+          assetList: [],
           ...initialIndexingState,
+          ...initialOptimisticSwitchState,
         }),
 
       // Indexing actions
@@ -434,7 +461,7 @@ export const useWrapStore = create<WrapStoreState>()(
           try {
             localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(persistedState));
           } catch (error) {
-            console.warn("Failed to persist indexing state:", error);
+            log.warn("Failed to persist indexing state:", error);
           }
         }
       },
@@ -483,7 +510,7 @@ export const useWrapStore = create<WrapStoreState>()(
 
           return true;
         } catch (error) {
-          console.warn("Failed to load persisted indexing state:", error);
+          log.warn("Failed to load persisted indexing state:", error);
           try {
             localStorage.removeItem(PERSISTENCE_KEY);
           } catch {
@@ -498,7 +525,7 @@ export const useWrapStore = create<WrapStoreState>()(
           try {
             localStorage.removeItem(PERSISTENCE_KEY);
           } catch (error) {
-            console.warn("Failed to clear persisted state:", error);
+            log.warn("Failed to clear persisted state:", error);
           }
         }
       },
@@ -511,6 +538,69 @@ export const useWrapStore = create<WrapStoreState>()(
           },
         }));
       },
+
+      // ─── Optimistic network switch actions ───────────────────────────────────
+
+      beginOptimisticSwitch: (newNetwork: Network) => {
+        const { network, switchAttempt } = get();
+        set({
+          previousNetwork: network,
+          optimisticNetwork: newNetwork,
+          phase: "switching",
+          switchError: null,
+          failureReason: null,
+          switchAttempt: switchAttempt + 1,
+          // Apply the optimistic network update to the UI immediately.
+          network: newNetwork,
+          ...syncContractState(newNetwork),
+        });
+      },
+
+      commitNetworkSwitch: () => {
+        set({
+          phase: "committed",
+          previousNetwork: null,
+          optimisticNetwork: null,
+          switchError: null,
+          failureReason: null,
+        });
+      },
+
+      rollbackNetworkSwitch: (
+        reason: NetworkSwitchFailureReason,
+        errorMessage: string,
+      ) => {
+        const { previousNetwork } = get();
+        if (previousNetwork === null) {
+          // Nothing to roll back – guard against double-calls.
+          return;
+        }
+        // Restore the previous network in the UI and reset dependent state.
+        resetCache();
+        horizonIndexer.clearCache();
+        get().cancelIndexing();
+        set({
+          phase: "rolled-back",
+          network: previousNetwork,
+          ...syncContractState(previousNetwork),
+          result: null,
+          cacheMeta: null,
+          status: "idle",
+          error: null,
+          switchError: errorMessage,
+          failureReason: reason,
+          previousNetwork: null,
+          optimisticNetwork: null,
+        });
+      },
+
+      clearNetworkSwitchError: () => {
+        set({
+          phase: "idle",
+          switchError: null,
+          failureReason: null,
+        });
+      },
     }),
     {
       name: "stellar-wrap-store",
@@ -521,7 +611,18 @@ export const useWrapStore = create<WrapStoreState>()(
         result: state.result,
         status: state.status,
         cacheMeta: state.cacheMeta,
+        assetList: Array.isArray(state.assetList) ? state.assetList : [],
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<WrapStoreState>;
+        return {
+          ...currentState,
+          ...persisted,
+          assetList: Array.isArray(persisted.assetList)
+            ? persisted.assetList
+            : currentState.assetList,
+        };
+      },
       storage: createJSONStorage(() =>
         typeof window !== "undefined"
           ? localStorage

@@ -11,7 +11,14 @@ jest.mock("@/app/services/indexerServer", () => ({
 
 jest.mock("@/app/utils/indexer", () => ({
   PERIODS: { monthly: 30, weekly: 7, yearly: 365 },
+  NEXT_PUBLIC_RPC_ENDPOINTS: {
+    mainnet: "https://horizon.stellar.org",
+    testnet: "https://horizon-testnet.stellar.org",
+  },
+  normalizePeriod: (raw: string | null | undefined) =>
+    raw ? (raw.toLowerCase() as "weekly" | "monthly" | "yearly") : "monthly",
 }));
+
 
 import { GET } from "../route";
 import { indexAccount } from "@/app/services/indexerServer";
@@ -24,7 +31,8 @@ function makeRequest(params: Record<string, string>) {
   return { nextUrl: { searchParams: url.searchParams } } as Parameters<typeof GET>[0];
 }
 
-const VALID_ACCOUNT = "G" + "A".repeat(55);
+const VALID_ACCOUNT = "GDRZZGQDRBLJBAY24O3EMZFDGZ4EY6A7L24OERKQTPLT4T7SZKLUAZVQ";
+
 
 describe("/api/wrapped error handling", () => {
   beforeEach(() => jest.clearAllMocks());

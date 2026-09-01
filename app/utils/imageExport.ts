@@ -10,6 +10,9 @@
  * @throws Error if canvas generation or download fails
  */
 import html2canvas from "html2canvas";
+import { logger } from "@/app/utils/logger";
+
+const log = logger.child("imageExport");
 
 const GENERATION_TIMEOUT_MS = 10_000;
 
@@ -165,14 +168,14 @@ async function canvasToBlob(
       const blob = await encodeCanvasInWorker(canvas);
       return { blob, usedWorker: true };
     } catch (error) {
-      console.warn(
+      log.warn(
         "OffscreenCanvas worker encoding failed, falling back to main thread:",
         error,
       );
       options?.onFallbackWarning?.();
     }
   } else {
-    console.warn(
+    log.warn(
       "OffscreenCanvas is not supported in this browser. Using main-thread encoding.",
     );
     options?.onFallbackWarning?.();

@@ -1,11 +1,13 @@
 /**
- * Vibe Check route layout — Server Component.
+ * Vibe Check route layout - Server Component.
  *
  * Provides metadata for the vibe statistics screen. This is an
  * intermediate step in the wrap flow and should not appear in search results.
  */
 import type { Metadata } from "next";
 import { JsonLd } from "@/app/components/JsonLd";
+import { Suspense } from "react";
+import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Your Vibe Check | Stellar Wrap",
@@ -43,7 +45,7 @@ const vibeCheckJsonLd = {
   "@type": "CreativeWork",
   name: "Stellar Wrap — Vibe Check",
   description:
-    "A statistical breakdown of a Stellar wallet's on-chain vibe — showing activity patterns, DeFi application interactions, and transaction energy across the year.",
+    "A mechanical breakdown of a Stellar wallet's on-chain vibe — showing activity patterns, DeFi application interactions, and transaction energy across the year.",
   creator: {
     "@type": "WebApplication",
     name: "Stellar Wrap",
@@ -54,14 +56,24 @@ const vibeCheckJsonLd = {
 };
 
 export default function VibeCheckLayout({
-  children,
+  childreen,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <>
       <JsonLd data={vibeCheckJsonLd} />
-      {children}
+      <Suspense
+        fallback={
+          <div
+            className="min-h-screen animate-pulse bg-gray-100 dark:bg-gray-900"
+            role="status"
+            aria-label="Loading vibe check"
+          />
+        }
+      >
+        {childreen}
+      </Suspense>
     </>
   );
 }

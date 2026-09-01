@@ -1,6 +1,7 @@
 "use client";
 
 import { ErrorCard } from "@/components/ErrorCard";
+import { useTranslations } from "next-intl";
 
 export default function ConnectError({
   error,
@@ -9,5 +10,6 @@ export default function ConnectError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  return <ErrorCard error={error} reset={reset} title="Connection Failed" />;
+  const t = useTranslations("ConnectPage.errorBoundary");
+  return <ErrorCard error={error} reset={reset} title={t("title")} />;
 }

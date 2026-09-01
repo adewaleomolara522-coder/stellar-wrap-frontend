@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Star } from "lucide-react";
-import type { WrapPeriod } from "@/app/store/wrapStore";
-import { PERIODS } from "@/app/utils/indexer";
+import type { WrapPeriod } from "@app/store/wrapStore";
+import { PERIODS } from "@app/utils/indexer";
 
 interface TransactionHeatmapProps {
   dailyActivity: Record<string, number>;
@@ -29,10 +29,7 @@ function getIntensityColor(count: number, max: number): string {
   return "var(--color-theme-primary)";
 }
 
-export function TransactionHeatmap({
-  dailyActivity,
-  period,
-}: TransactionHeatmapProps) {
+export function TransactionHeatmap({ dailyActivity, period }: TransactionHeatmapProps) {
   const [tooltip, setTooltip] = useState<{
     date: string;
     count: number;
@@ -78,87 +75,109 @@ export function TransactionHeatmap({
     };
   }, [dailyActivity, period]);
 
-  const cols = period === "yearly" ? 53 : period === "monthly" ? 7 : 7;
-  const isScrollable = period === "yearly";
+  const isYearly = period === "yearly";
+  const cols = isYearly ? Math.ceil(cells.length / 7) : 7;
+  const isScrollable = isYearly;
+
+  const gridStyle = isYearly
+    ? { gridTemplateRows: `repeat(7, var(--cell-size))`, gridAutoFlow: "column" as const }
+    : { gridTemplateColumns: `repeat(7, var(--cell-size))`, gridAutoFlow: "row" as const };
+
+  const renderCells = () =>
+    cells.map((cell) => {
+      const isPeak = cell.date === mostActiveDay && cell.count > 0;
+      return (
+        <div
+          key={cell.date}
+          className="relative h-[var(--cell-size)] w-[var(--cell-size)] cursor-pointer rounded-sm transition-transform hover:scale-125"
+          style={{ backgroundColor: getIntensityColor(cell.count, maxCount) }}
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setTooltip({
+              date: cell.date,
+              count: cell.count,
+              x: rect.left + rect.width / 2,
+              y: rect.top,
+            });
+          }}
+          onMouseLeave={() => setTooltip(null)}
+          onClick={() =>
+            setTooltip({
+              date: cell.date,
+              count: cell.count,
+              x: 0,
+              y: 0,
+            })
+          }
+          title={`${cell.count} transaction${cell.count === 1 ? "" : "s"} on ${formatTooltipDate(cell.date)}`}
+        >
+          {isPeak && (
+            <Star className="absolute -top-1 -right-1 h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+          )}
+        </div>
+      );
+    });
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.6 }}
-      className="mt-8 sm:mt-10 w-full"
+      className="mt-8 w-full sm:mt-10"
     >
-      <h3 className="text-xs sm:text-sm font-black tracking-[0.25em] text-white/50 mb-3 sm:mb-4">
+      <h3 className="mb-3 text-xs font-black tracking-[0.25em] text-white/50 sm:mb-4 sm:text-sm">
         ACTIVITY HEATMAP
       </h3>
 
       <div
-        className={`rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-4 sm:p-5 ${
+        className={`rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur [--cell-size:0.75rem] sm:rounded-2xl sm:p-5 sm:[--cell-size:1rem] ${
           isScrollable ? "overflow-x-auto" : ""
         }`}
       >
-        <div className="flex gap-1 mb-2 text-[10px] text-white/40 font-bold">
-          {dayLabels.map((label, i) => (
-            <span key={i} className="w-3 sm:w-4 text-center shrink-0">
-              {label}
-            </span>
-          ))}
-        </div>
+        {!isYearly && (
+          <div
+            className="mx-auto mb-2 grid w-max gap-1 text-[10px] font-bold text-white/40"
+            style={{ gridTemplateColumns: `repeat(7, var(--cell-size))` }}
+          >
+            {dayLabels.map((label, i) => (
+              <span key={i} className="text-center">
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
 
-        <div
-          className="grid gap-1"
-          style={{
-            gridTemplateColumns: `repeat(${isScrollable ? Math.ceil(cells.length / 7) : cols}, minmax(0, 1fr))`,
-            minWidth: isScrollable ? `${Math.ceil(cells.length / 7) * 16}px` : undefined,
-          }}
-        >
-          {cells.map((cell) => {
-            const isPeak = cell.date === mostActiveDay && cell.count > 0;
-            return (
-              <div
-                key={cell.date}
-                className="relative aspect-square w-3 sm:w-4 rounded-sm cursor-pointer transition-transform hover:scale-125"
-                style={{ backgroundColor: getIntensityColor(cell.count, maxCount) }}
-                onMouseEnter={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setTooltip({
-                    date: cell.date,
-                    count: cell.count,
-                    x: rect.left + rect.width / 2,
-                    y: rect.top,
-                  });
-                }}
-                onMouseLeave={() => setTooltip(null)}
-                onClick={() =>
-                  setTooltip({
-                    date: cell.date,
-                    count: cell.count,
-                    x: 0,
-                    y: 0,
-                  })
-                }
-                title={`${cell.count} transaction${cell.count === 1 ? "" : "s"} on ${formatTooltipDate(cell.date)}`}
-              >
-                {isPeak && (
-                  <Star className="absolute -top-1 -right-1 w-2.5 h-2.5 text-yellow-400 fill-yellow-400" />
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {isYearly ? (
+          <div className="flex w-max">
+            <div
+              className="mr-1 grid gap-1 text-[10px] font-bold text-white/40"
+              style={{ gridTemplateRows: `repeat(7, var(--cell-size))` }}
+            >
+              {dayLabels.map((label, i) => (
+                <span key={i} className="flex items-center justify-center">
+                  {label}
+                </span>
+              ))}
+            </div>
+            <div className="grid gap-1" style={gridStyle}>
+              {renderCells()}
+            </div>
+          </div>
+        ) : (
+          <div className="mx-auto grid w-max gap-1" style={gridStyle}>
+            {renderCells()}
+          </div>
+        )}
 
         {/* Legend */}
-        <div className="flex items-center gap-2 mt-4 text-[10px] text-white/50">
+        <div className="mt-4 flex items-center gap-2 text-[10px] text-white/50">
           <span>Less</span>
           {[0, 0.25, 0.5, 0.75, 1].map((level) => (
             <div
               key={level}
-              className="w-3 h-3 rounded-sm"
+              className="h-3 w-3 rounded-sm"
               style={{
-                backgroundColor: getIntensityColor(
-                  level * (maxCount || 1),
-                  maxCount || 1,
-                ),
+                backgroundColor: getIntensityColor(level * (maxCount || 1), maxCount || 1),
               }}
             />
           ))}
@@ -167,7 +186,7 @@ export function TransactionHeatmap({
       </div>
 
       {tooltip && (
-        <div className="mt-2 text-center text-sm text-white/70 font-medium">
+        <div className="mt-2 text-center text-sm font-medium text-white/70">
           {tooltip.count} transaction{tooltip.count === 1 ? "" : "s"} on{" "}
           {formatTooltipDate(tooltip.date)}
         </div>

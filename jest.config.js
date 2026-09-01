@@ -23,6 +23,9 @@ const customJestConfig = {
   coverageDirectory: './coverage',
   collectCoverageFrom: [
     'src/services/**/*.{js,jsx,ts,tsx}',
+    'app/components/Pagination.tsx',
+    'app/components/paginationStore.ts',
+    'app/components/usePaginationController.ts',
     '!src/services/**/__tests__/**',
     '!src/services/**/types.ts',
     '!**/*.d.ts',

@@ -107,26 +107,36 @@ export class IndexerEventEmitter extends EventEmitter {
 
     const store = useWrapStore;
 
-    this.on("step-change", ({ step }) => {
+    // EventEmitter's own .on() listener signature is untyped
+    // ((...args: any[]) => void), so each callback here is explicitly
+    // typed against the matching IndexerEvent member — otherwise the
+    // destructured `step` etc. below is implicitly `any`.
+    this.on("step-change", ({ step }: Extract<IndexerEvent, { type: "step-change" }>) => {
       store.getState().setCurrentStep(step);
     });
 
-    this.on("step-progress", ({ step, progress }) => {
-      const state = store.getState();
-      // Drop late events after step completion (defense in depth; store also clamps)
-      if (state.completedStepRecord[step]) {
-        return;
-      }
-      store.getState().setStepProgress(step, progress);
-    });
+    this.on(
+      "step-progress",
+      ({ step, progress }: Extract<IndexerEvent, { type: "step-progress" }>) => {
+        const state = store.getState();
+        // Drop late events after step completion (defense in depth; store also clamps)
+        if (state.completedStepRecord[step]) {
+          return;
+        }
+        store.getState().setStepProgress(step, progress);
+      },
+    );
 
-    this.on("step-complete", ({ step }) => {
+    this.on("step-complete", ({ step }: Extract<IndexerEvent, { type: "step-complete" }>) => {
       store.getState().completeStep(step);
     });
 
-    this.on("step-error", ({ step, message, recoverable }) => {
-      store.getState().setIndexingError(step, message, recoverable);
-    });
+    this.on(
+      "step-error",
+      ({ step, message, recoverable }: Extract<IndexerEvent, { type: "step-error" }>) => {
+        store.getState().setIndexingError(step, message, recoverable);
+      },
+    );
 
     this.on("indexing-complete", () => {
       store.getState().clearPersistedIndexingState();

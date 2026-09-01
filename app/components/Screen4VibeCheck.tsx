@@ -1,15 +1,34 @@
 "use client";
 
 import { motion } from 'framer-motion';
-import { useMemo } from 'react';
-import { TrendingUp, Palette, Code, Sparkles, Crown } from 'lucide-react';
+import { lazy, Suspense, useMemo } from 'react';
+import { TrendingUp, Palette, Code } from 'lucide-react';
 import { formatDappDisplayName } from '@/app/utils/formatDappLabel';
-import { DappIcon } from '@/app/components/DappIcon';
-import { DexTradingSummary } from './DexTradingSummary';
-import { SorobanBuilderTimeline } from './SorobanBuilderTimeline';
-import { PortfolioDiversityCard } from './PortfolioDiversityCard';
-import { BiggestDayCard } from './BiggestDayCard';
 import type { DexTradingSummary as DexTradingSummaryType, SorobanBuilderSummary as SorobanBuilderSummaryType, PortfolioDiversitySummary, BiggestDaySummary, NftActivitySummary } from '@/app/utils/indexer';
+
+const DappIcon = lazy(() =>
+  import('@/app/components/DappIcon').then(m => ({ default: m.DappIcon }))
+);
+
+const DexTradingSummary = lazy(() =>
+  import('./DexTradingSummary').then(m => ({ default: m.DexTradingSummary }))
+);
+
+const SorobanBuilderTimeline = lazy(() =>
+  import('./SorobanBuilderTimeline').then(m => ({ default: m.SorobanBuilderTimeline }))
+);
+
+const PortfolioDiversityCard = lazy(() =>
+  import('./PortfolioDiversityCard').then(m => ({ default: m.PortfolioDiversityCard }))
+);
+
+const BiggestDayCard = lazy(() =>
+  import('./BiggestDayCard').then(m => ({ default: m.BiggestDayCard }))
+);
+
+const NftActivityCard = lazy(() =>
+  import('./NftActivityCard').then(m => ({ default: m.NftActivityCard }))
+);
 
 type VibeIconKey = 'defi' | 'nft' | 'dev';
 
@@ -44,99 +63,6 @@ const vibeIcons: Record<VibeIconKey, React.ComponentType<{ className?: string }>
   nft: Palette,
   dev: Code,
 };
-
-function shortenAddress(address: string): string {
-  if (address.length <= 10) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
-function NftActivityCard({ summary }: { summary?: NftActivitySummary }) {
-  if (!summary || summary.mintCount === 0) return null;
-
-  const hasTopCreator = summary.topCreatorAddress && summary.topCreatorMintCount > 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.9, type: "spring", stiffness: 120 }}
-      className="mt-8 sm:mt-10 md:mt-12"
-    >
-      <h3 className="text-xs sm:text-sm font-black tracking-[0.25em] text-white/50 mb-3 sm:mb-4">
-        NFT ACTIVITY
-      </h3>
-      <div
-        className="p-5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-white/10 backdrop-blur-md relative overflow-hidden"
-        style={{ backgroundColor: "rgba(255, 255, 255, 0.03)" }}
-      >
-        <div className="flex flex-col gap-5 sm:gap-6">
-          <div className="flex items-center gap-4 sm:gap-5">
-            <motion.div
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: 'var(--color-theme-primary)' }}
-              animate={{
-                boxShadow: [
-                  `0 0 15px rgba(var(--color-theme-primary-rgb), 0.3)`,
-                  `0 0 30px rgba(var(--color-theme-primary-rgb), 0.5)`,
-                  `0 0 15px rgba(var(--color-theme-primary-rgb), 0.3)`,
-                ],
-              }}
-              transition={{ duration: 2.5, repeat: Infinity }}
-            >
-              <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-black" />
-            </motion.div>
-            <div>
-              <p className="text-xs sm:text-sm font-semibold text-white/50 uppercase tracking-wider mb-1">
-                Mints Collected
-              </p>
-              <motion.span
-                className="text-4xl sm:text-5xl md:text-6xl font-black text-white block leading-none"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 1, type: "spring", stiffness: 200 }}
-              >
-                {summary.mintCount.toLocaleString()}
-              </motion.span>
-            </div>
-          </div>
-
-          {hasTopCreator && (
-            <div className="pt-4 sm:pt-5 border-t border-white/10">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border-2 border-white/20 flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: 'rgba(var(--color-theme-primary-rgb), 0.15)' }}
-                  >
-                    <Crown className="w-5 h-5 sm:w-6 sm:h-6 text-theme-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-0.5">
-                      Top Creator
-                    </p>
-                    <p
-                      className="text-base sm:text-lg font-bold text-white truncate font-mono"
-                      title={summary.topCreatorAddress ?? undefined}
-                    >
-                      {shortenAddress(summary.topCreatorAddress!)}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-0.5">
-                    Mints
-                  </p>
-                  <p className="text-xl sm:text-2xl font-black text-white/80 tabular-nums">
-                    {summary.topCreatorMintCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 export function Screen4VibeCheck({
   vibes,
@@ -288,6 +214,15 @@ export function Screen4VibeCheck({
               })}
             </div>
 
+            <Suspense
+              fallback={
+                <div
+                  role="status"
+                  aria-label="Loading summary data"
+                  className="mt-8 h-80 rounded-xl border border-white/10 bg-white/5 animate-pulse"
+                />
+              }
+            >
             {topDapps.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -345,6 +280,7 @@ export function Screen4VibeCheck({
             <BiggestDayCard summary={biggestDaySummary} />
             <DexTradingSummary summary={dexTradingSummary} />
             <SorobanBuilderTimeline summary={sorobanBuilderSummary} />
+            </Suspense>
             </div>
           </div>
 
@@ -463,3 +399,5 @@ export function Screen4VibeCheck({
     </div>
   );
 }
+
+export default Screen4VibeCheck;

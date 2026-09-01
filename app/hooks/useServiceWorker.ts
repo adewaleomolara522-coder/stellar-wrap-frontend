@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { logger } from "@/app/utils/logger";
+
+const log = logger.child("useServiceWorker");
 
 export interface UseServiceWorkerReturn {
   isSupported: boolean;
@@ -10,7 +13,12 @@ export interface UseServiceWorkerReturn {
   unsubscribe: () => Promise<void>;
 }
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+// `Uint8Array<ArrayBuffer>`, not the default `Uint8Array<ArrayBufferLike>`:
+// `Uint8Array.from()` below always constructs a plain ArrayBuffer-backed
+// array (never SharedArrayBuffer-backed), and PushManager.subscribe()'s
+// applicationServerKey requires a BufferSource, which as of TypeScript
+// 5.7's lib.dom types no longer accepts the wider ArrayBufferLike.
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
     .replace(/-/g, "+")
@@ -56,7 +64,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
         }
       })
       .catch((err) => {
-        console.warn("[useServiceWorker] Registration failed:", err);
+        log.warn("Registration failed:", err);
         setIsSupported(false);
       });
   }, []);
@@ -71,7 +79,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
 
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapidKey) {
-      console.warn("[useServiceWorker] NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set");
+      log.warn("NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set");
       return;
     }
 
@@ -82,7 +90,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
       });
       setPushSubscription(subscription);
     } catch (err) {
-      console.warn("[useServiceWorker] Push subscription failed:", err);
+      log.warn("Push subscription failed:", err);
     }
   }, [isSupported]);
 
@@ -92,7 +100,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
       await pushSubscription.unsubscribe();
       setPushSubscription(null);
     } catch (err) {
-      console.warn("[useServiceWorker] Unsubscribe failed:", err);
+      log.warn("Unsubscribe failed:", err);
     }
   }, [pushSubscription]);
 

@@ -1,312 +1,161 @@
 /**
- * Stellar amount utilities
+ * Stellar amount helpers: XLM ↔ stroops conversion and 7-decimal formatting.
  *
- * All on-chain amounts in Stellar are stored as integer stroops.
- * 1 XLM = 10,000,000 stroops (10^7).
+ * XLM amounts on Stellar are expressed as stroops (1 XLM = 10,000,000 stroops)
+ * with a maximum precision of 7 decimal places. Working in stroops avoids the
+ * floating-point drift that naive `number` arithmetic introduces, and keeps
+ * signatures, balances, and fees consistent.
  *
- * This module provides:
- *   - `stroopsToXlm`    – bigint stroops → 7-dp XLM string
- *   - `xlmToStroops`    – XLM string → bigint stroops
- *   - `formatXlm`       – human-readable display with configurable decimals
- *   - `formatStroops`   – display a stroop value as XLM with unit label
- *   - `parseXlmInput`   – safe parse of user-typed XLM strings
- *   - `isValidXlmAmount`– validates a user-provided XLM input string
- *   - `truncatePublicKey`– shortens a Stellar public key for display
- *
- * Precision guarantee
- * ───────────────────
- * Stellar enforces a 7 decimal place maximum (1 stroop = 0.0000001 XLM).
- * Any input with more than 7 dp throws a `RangeError` so the caller always
- * knows the value cannot be faithfully represented on-chain.
- *
- * No `any` is used in this module.
+ * @module stellarAmounts
  */
 
-/** A value expressed in integer stroops (1 XLM = 10_000_000 stroops). */
-export type Stroops = bigint;
+/** Number of stroops in one XLM. */
+export const STROOPS_PER_XLM = 10_000_000;
 
-/** A value expressed as a 7-decimal-place XLM string, e.g. "1.2500000". */
-export type XlmAmount = string;
+/** Maximum decimal precision of an XLM amount. */
+export const XLM_MAX_PRECISION = 7;
 
-/** Number of stroops per XLM. */
-const STROOPS_PER_XLM = 10_000_000n;
-const STROOPS_PER_XLM_NUMBER = 10_000_000;
+/** Largest stroops value storable in a signed 64-bit integer. */
+export const MAX_TOTAL_STROOPS = (1n << 63n) - 1n;
 
-// ─── Core conversion ─────────────────────────────────────────────────────────
+export type AmountFailureReason =
+  | "invalid"
+  | "too-many-decimals"
+  | "negative"
+  | "overflow";
+
+export type AmountResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: AmountFailureReason };
+
+export type StroopsParseResult = AmountResult<bigint>;
+
+const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
 
 /**
- * Converts a raw stroop integer to a fixed 7-dp XLM string.
+ * Converts the decimal string representation of an XLM amount to stroops.
  *
- * @example
- * stroopsToXlm(12_500_000n)  // → "1.2500000"
- * stroopsToXlm(0n)           // → "0.0000000"
+ * Accepts at most `XLM_MAX_PRECISION` fractional digits, rejects negative and
+ * non-numeric input, and guards against values that exceed the signed 64-bit
+ * stroops range.
+ *
+ * @param raw - Decimal XLM amount, e.g. "42.1234567"
+ * @returns `{ ok: true, value }` on success, or a categorized failure.
  */
-export function stroopsToXlm(stroops: Stroops): XlmAmount {
-  if (stroops < 0n) {
-    throw new RangeError(`Stroops value must be non-negative, received ${stroops}`);
+export function parseAmountToStroops(raw: string): StroopsParseResult {
+  if (typeof raw !== "string") {
+    return { ok: false, reason: "invalid" };
   }
-  const whole = stroops / STROOPS_PER_XLM;
-  const frac = (stroops % STROOPS_PER_XLM).toString().padStart(7, "0");
-  return `${whole}.${frac}`;
+
+  const trimmed = raw.trim();
+  if (!DECIMAL_PATTERN.test(trimmed)) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const dotIndex = trimmed.indexOf(".");
+  const intPart = dotIndex === -1 ? trimmed : trimmed.slice(0, dotIndex);
+  const fracPart = dotIndex === -1 ? "" : trimmed.slice(dotIndex + 1);
+
+  if (fracPart.length > XLM_MAX_PRECISION) {
+    return { ok: false, reason: "too-many-decimals" };
+  }
+
+  const intStroops = BigInt(intPart) * BigInt(STROOPS_PER_XLM);
+  const fracStroops =
+    fracPart.length === 0 ? 0n : BigInt(fracPart.padEnd(XLM_MAX_PRECISION, "0"));
+
+  const stroops = intStroops + fracStroops;
+  if (stroops > MAX_TOTAL_STROOPS) {
+    return { ok: false, reason: "overflow" };
+  }
+
+  return { ok: true, value: stroops };
 }
 
 /**
- * Converts an XLM string to an integer stroops bigint.
- * Throws `RangeError` if the input has more than 7 decimal places.
+ * Converts a numeric or decimal-string XLM amount to stroops.
  *
- * @example
- * xlmToStroops("1.25")       // → 12_500_000n
- * xlmToStroops("0.0000001")  // → 1n
+ * Numeric input is normalized to its decimal string first so rounding honors
+ * 7-decimal precision regardless of how the caller represents the number.
+ *
+ * @param amount - XLM amount as a number or decimal string.
+ * @returns A result union; never throws for user-provided input.
  */
-export function xlmToStroops(xlm: XlmAmount): Stroops {
-  const trimmed = xlm.trim();
-  if (!isValidXlmAmount(trimmed)) {
-    throw new RangeError(`Invalid XLM amount: "${xlm}"`);
+export function xlmToStroops(amount: number | string): StroopsParseResult {
+  if (typeof amount === "number") {
+    if (!Number.isFinite(amount)) {
+      return { ok: false, reason: "invalid" };
+    }
+    if (amount < 0) {
+      return { ok: false, reason: "negative" };
+    }
+    return parseAmountToStroops(amount.toFixed(XLM_MAX_PRECISION));
   }
-
-  const parts = trimmed.split(".");
-  const wholePart = parts[0] ?? "0";
-  const fracRaw = parts[1] ?? "";
-
-  if (fracRaw.length > 7) {
-    throw new RangeError(
-      `Amount "${xlm}" has more than 7 decimal places. Stellar supports a maximum of 7-dp precision.`,
-    );
-  }
-
-  const fracPadded = fracRaw.padEnd(7, "0");
-  const wholeStroops = BigInt(wholePart) * STROOPS_PER_XLM;
-  const fracStroops = BigInt(fracPadded);
-
-  return wholeStroops + fracStroops;
+  return parseAmountToStroops(amount);
 }
 
-// ─── Display formatting ──────────────────────────────────────────────────────
+/**
+ * Converts stroops to a floating-point XLM amount.
+ *
+ * The fractional component is derived by integer division so no stroop is
+ * lost; the returned double is only ever used for display/estimation, never
+ * for re-scaling back to stroops.
+ *
+ * @param stroops - Stroop value as a bigint, number, or numeric string.
+ * @returns XLM amount as a number.
+ */
+export function stroopsToXlm(stroops: bigint | number | string): number {
+  const value = toStroopsBigInt(stroops);
+  const whole = value / BigInt(STROOPS_PER_XLM);
+  const frac = value % BigInt(STROOPS_PER_XLM);
+  return Number(whole) + Number(frac) / STROOPS_PER_XLM;
+}
 
-/** Options for `formatXlm`. */
+/**
+ * Formats a stroops value as an XLM string with up to 7 decimal places.
+ *
+ * `maxFractionDigits` is clamped to `XLM_MAX_PRECISION` and defaults to it, so
+ * balances and fees render with consistent precision (matching the `toFixed(7)`
+ * convention used elsewhere in the app).
+ */
 export interface FormatXlmOptions {
-  /**
-   * Number of decimal places to display.
-   * Must be between 0 and 7 inclusive.
-   * @default 7
-   */
-  decimals?: number;
-  /**
-   * Whether to append the " XLM" unit label.
-   * @default false
-   */
-  showUnit?: boolean;
-  /**
-   * Whether to use locale-specific thousands separators.
-   * @default false
-   */
-  useGrouping?: boolean;
+  maxFractionDigits?: number;
 }
 
-/**
- * Formats an XLM string or bigint stroop value for human display.
- *
- * @example
- * formatXlm("1.2500000")                          // → "1.2500000"
- * formatXlm("1.2500000", { decimals: 2 })         // → "1.25"
- * formatXlm("1.2500000", { showUnit: true })       // → "1.2500000 XLM"
- * formatXlm(12_500_000n,  { decimals: 2 })         // → "1.25"
- * formatXlm("1000.0000000", { useGrouping: true }) // → "1,000.0000000"
- */
 export function formatXlm(
-  amount: XlmAmount | Stroops,
+  stroops: bigint | number | string,
   options: FormatXlmOptions = {},
 ): string {
-  const { decimals = 7, showUnit = false, useGrouping = false } = options;
-
-  if (decimals < 0 || decimals > 7 || !Number.isInteger(decimals)) {
-    throw new RangeError(`decimals must be an integer between 0 and 7, received ${decimals}`);
-  }
-
-  const xlmString: XlmAmount =
-    typeof amount === "bigint" ? stroopsToXlm(amount) : amount;
-
-  const numeric = parseFloat(xlmString);
-  if (!Number.isFinite(numeric)) {
-    throw new RangeError(`Cannot format non-finite XLM value: "${xlmString}"`);
-  }
-
-  const formatted = useGrouping
-    ? numeric.toLocaleString("en-US", {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      })
-    : numeric.toFixed(decimals);
-
-  return showUnit ? `${formatted} XLM` : formatted;
+  const maxFractionDigits = options.maxFractionDigits ?? XLM_MAX_PRECISION;
+  const clamped = Math.min(
+    Math.max(Math.floor(maxFractionDigits), 0),
+    XLM_MAX_PRECISION,
+  );
+  return stroopsToXlm(stroops).toFixed(clamped);
 }
 
 /**
- * Formats a stroop value as a human-readable XLM amount, always appending
- * the unit label.
+ * Coerces a bigint / integer number / integer string into a stroops bigint.
  *
- * @example
- * formatStroops(12_500_000n)               // → "1.2500000 XLM"
- * formatStroops(12_500_000n, { decimals: 2 }) // → "1.25 XLM"
- */
-export function formatStroops(
-  stroops: Stroops,
-  options: Omit<FormatXlmOptions, "showUnit"> = {},
-): string {
-  return formatXlm(stroops, { ...options, showUnit: true });
-}
-
-// ─── Input parsing ───────────────────────────────────────────────────────────
-
-/** Result of a safe XLM parse operation. */
-export type ParseXlmResult =
-  | { ok: true; stroops: Stroops; xlm: XlmAmount }
-  | { ok: false; error: string };
-
-/**
- * Safely parses a user-typed XLM string into stroops without throwing.
- * Returns a discriminated union so callers can handle errors without try/catch.
+ * Unlike `parseAmountToStroops`, the input here is already a whole stroop
+ * count, so it is converted verbatim and only range-checked.
  *
- * @example
- * parseXlmInput("1.25")   // → { ok: true, stroops: 12_500_000n, xlm: "1.2500000" }
- * parseXlmInput("abc")    // → { ok: false, error: "..." }
- * parseXlmInput("1.12345678") // → { ok: false, error: "..." }
+ * @param value - Whole stroops count.
+ * @returns The stroops bigint, or throws on negative or out-of-range input.
  */
-export function parseXlmInput(input: string): ParseXlmResult {
-  const trimmed = input.trim();
+function toStroopsBigInt(value: bigint | number | string): bigint {
+  const big =
+    typeof value === "bigint"
+      ? value
+      : typeof value === "number"
+        ? BigInt(Math.trunc(value))
+        : BigInt(value.trim() || "0");
 
-  if (!trimmed) {
-    return { ok: false, error: "Amount is required." };
+  if (big < 0n) {
+    throw new RangeError(`Invalid stroops value: ${String(value)}`);
   }
-
-  if (!isValidXlmAmount(trimmed)) {
-    return {
-      ok: false,
-      error:
-        "Invalid amount. Enter a positive number with up to 7 decimal places (e.g. 1.5 or 0.0000001).",
-    };
+  if (big > MAX_TOTAL_STROOPS) {
+    throw new RangeError(`Stroops value exceeds Int64 range: ${String(value)}`);
   }
-
-  const parts = trimmed.split(".");
-  const fracPart = parts[1] ?? "";
-  if (fracPart.length > 7) {
-    return {
-      ok: false,
-      error: "Stellar supports a maximum of 7 decimal places.",
-    };
-  }
-
-  try {
-    const stroops = xlmToStroops(trimmed);
-    if (stroops === 0n) {
-      return { ok: false, error: "Amount must be greater than zero." };
-    }
-    return { ok: true, stroops, xlm: stroopsToXlm(stroops) };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: message };
-  }
-}
-
-// ─── Validation ──────────────────────────────────────────────────────────────
-
-/**
- * Returns true if the string is a valid non-negative XLM amount with at most
- * 7 decimal places. Does NOT check that the amount is > 0.
- *
- * Accepts: "0", "1", "1.5", "1.2500000", "100000.0000001"
- * Rejects: "-1", "abc", "1.12345678", "", "1e7"
- */
-export function isValidXlmAmount(value: string): boolean {
-  // Must be a plain decimal number (no scientific notation, no sign)
-  return /^\d+(\.\d{1,7})?$/.test(value.trim());
-}
-
-// ─── Comparison helpers ──────────────────────────────────────────────────────
-
-/**
- * Returns true if `a` is greater than or equal to `b`.
- *
- * @example
- * stroopsGte(10n, 5n)  // → true
- * stroopsGte(5n, 10n)  // → false
- */
-export function stroopsGte(a: Stroops, b: Stroops): boolean {
-  return a >= b;
-}
-
-/**
- * Clamps a stroop value to [min, max].
- */
-export function clampStroops(value: Stroops, min: Stroops, max: Stroops): Stroops {
-  if (min > max) {
-    throw new RangeError(`clampStroops: min (${min}) must be ≤ max (${max})`);
-  }
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
-}
-
-// ─── Number → stroop helpers ─────────────────────────────────────────────────
-
-/**
- * Converts a JS `number` expressed in XLM to stroops.
- * Only safe for values that fit within Number precision (< 9e15 XLM).
- * For large amounts use `xlmToStroops` with a string input.
- *
- * @example
- * numberToStroops(1.25)  // → 12_500_000n
- */
-export function numberToStroops(xlm: number): Stroops {
-  if (!Number.isFinite(xlm) || xlm < 0) {
-    throw new RangeError(`numberToStroops: expected a non-negative finite number, received ${xlm}`);
-  }
-  // Round to 7 dp to avoid floating-point drift before converting
-  const rounded = Math.round(xlm * STROOPS_PER_XLM_NUMBER);
-  return BigInt(rounded);
-}
-
-// ─── Public key display ──────────────────────────────────────────────────────
-
-/** Options for `truncatePublicKey`. */
-export interface TruncateKeyOptions {
-  /**
-   * Number of characters to keep from the start.
-   * @default 6
-   */
-  prefixLength?: number;
-  /**
-   * Number of characters to keep from the end.
-   * @default 4
-   */
-  suffixLength?: number;
-  /**
-   * Separator placed between prefix and suffix.
-   * @default "…"
-   */
-  separator?: string;
-}
-
-/**
- * Shortens a Stellar public key for display, e.g.:
- *   "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN"
- *   → "GAAZI4…CCWN"
- */
-export function truncatePublicKey(
-  publicKey: string,
-  options: TruncateKeyOptions = {},
-): string {
-  const {
-    prefixLength = 6,
-    suffixLength = 4,
-    separator = "\u2026", // …
-  } = options;
-
-  if (publicKey.length <= prefixLength + suffixLength) {
-    return publicKey;
-  }
-
-  const prefix = publicKey.slice(0, prefixLength);
-  const suffix = publicKey.slice(-suffixLength);
-  return `${prefix}${separator}${suffix}`;
+  return big;
 }

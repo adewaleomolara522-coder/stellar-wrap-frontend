@@ -81,15 +81,21 @@ export const ARCHETYPES: Record<string, ArchetypeConfig> = {
   },
   /** Yield Farmer: active on DEX with high swap/offer volume and LP positions */
   "The Yield Farmer": {
-    color: "#22C55E",
-    gradient: "linear-gradient(135deg, #22C55E 0%, #15803D 100%)",
-    icon: Leaf,
+    style: {
+      color: "#22C55E",
+      gradient: "linear-gradient(135deg, #22C55E 0%, #15803D 100%)",
+      icon: Leaf,
+    },
+    description: "You tend the liquidity pools like fertile fields. Every swap and every position is cultivated for the harvest.",
   },
   /** Hodler: long-term, low-activity wallet that prefers holding over trading */
   "The Hodler": {
-    color: "#EAB308",
-    gradient: "linear-gradient(135deg, #EAB308 0%, #92400E 100%)",
-    icon: Vault,
+    style: {
+      color: "#EAB308",
+      gradient: "linear-gradient(135deg, #EAB308 0%, #92400E 100%)",
+      icon: Vault,
+    },
+    description: "Patience is your edge. While others chase every candle, you hold steady and let conviction do the work.",
   },
 };
 
@@ -116,3 +122,24 @@ export function archetypeImagePath(name: string): string {
     .replace(/\s+/g, "-");
   return `/archetypes/${slug}.png`;
 }
+
+/**
+ * Maps each archetype data key (used in API responses / wrapStore) to the
+ * corresponding next-intl translation sub-key inside the `Persona.archetypes`
+ * namespace.  This keeps archetype identification stable as a plain English
+ * string while allowing the display name to be fully translated.
+ *
+ * Usage in a component:
+ *   const t = useTranslations('Persona');
+ *   const displayName = t(`archetypes.${ARCHETYPE_TRANSLATION_KEYS[archetypeKey] ?? 'theWizard'}`);
+ */
+export const ARCHETYPE_TRANSLATION_KEYS: Record<string, string> = {
+  "The Wizard": "theWizard",
+  "The Explorer": "theExplorer",
+  "The Architect": "theArchitect",
+  "The Patron": "thePatron",
+  "The Collector": "theCollector",
+  "The Trader": "theTrader",
+  "The Yield Farmer": "theYieldFarmer",
+  "The Hodler": "theHodler",
+};

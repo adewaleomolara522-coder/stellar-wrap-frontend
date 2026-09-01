@@ -1,16 +1,41 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { AlertCircle, RotateCcw, X } from "lucide-react";
+import { lazy, Suspense } from "react";
 import { useWrapStore } from "@/app/store/wrapStore";
 import { INDEXING_STEPS, STEP_ORDER } from "@/app/types/indexing";
+
+const AlertCircle = lazy(() =>
+  import("lucide-react").then((m) => ({ default: m.AlertCircle }))
+);
+const RotateCcw = lazy(() =>
+  import("lucide-react").then((m) => ({ default: m.RotateCcw }))
+);
+const X = lazy(() =>
+  import("lucide-react").then((m) => ({ default: m.X }))
+);
+
+const motion = {
+  div: lazy(() =>
+    import("framer-motion").then((m) => ({ default: m.motion.div }))
+  ),
+  span: lazy(() =>
+    import("framer-motion").then((m) => ({ default: m.motion.span }))
+  ),
+  button: lazy(() =>
+    import("framer-motion").then((m) => ({ default: m.motion.button }))
+  ),
+};
+
+const AnimatePresence = lazy(() =>
+  import("framer-motion").then((m) => ({ default: m.AnimatePresence }))
+);
 
 interface StepProgressDisplayProps {
   onRetry?: () => void;
   onCancel?: () => void;
 }
 
-export function StepProgressDisplay({
+function StepProgressDisplayBase({
   onRetry,
   onCancel,
 }: StepProgressDisplayProps) {
@@ -316,3 +341,31 @@ export function StepProgressDisplay({
     </motion.div>
   );
 }
+
+export function StepProgressDisplay(props: StepProgressDisplayProps) {
+  return (
+    <Suspense
+      fallback={
+        <div role="status" className="w-full max-w-2xl mx-auto px-4">
+          <span className="sr-only">Loading progress display...</span>
+          <div
+            aria-hidden="true"
+            className="relative rounded-2xl border border-white/10 bg-linear-to-b from-white/5 to-transparent backdrop-blur-xl p-8 space-y-6"
+          >
+            <div className="space-y-2">
+              <div className="h-8 w-2/3 rounded bg-white/10 animate-pulse" />
+              <div className="h-4 w-1/2 rounded bg-white/10 animate-pulse" />
+            </div>
+            <div className="h-24 rounded-xl bg-white/5 animate-pulse" />
+            <div className="h-2 rounded-full bg-white/10 animate-pulse" />
+            <div className="h-3 rounded-full bg-white/10 animate-pulse" />
+          </div>
+        </div>
+      }
+    >
+      <StepProgressDisplayBase {...props} />
+    </Suspense>
+  );
+}
+
+export default StepProgressDisplay;

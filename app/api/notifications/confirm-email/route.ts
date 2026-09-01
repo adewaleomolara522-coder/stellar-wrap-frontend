@@ -7,7 +7,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { kvGet, kvSet, SUB_KEY } from "../_lib/kv";
+import { logger } from "@/app/utils/logger";
 import type { SubscriptionRecord } from "@/app/types/notifications";
+
+const log = logger.child("api:confirm-email");
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +63,7 @@ export async function GET(request: NextRequest) {
       new URL("/notifications?confirmed=true", request.url),
     );
   } catch (err) {
-    console.error("[GET /api/notifications/confirm-email]", err);
+    log.error("Internal error confirming email subscription:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

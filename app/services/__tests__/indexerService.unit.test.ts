@@ -233,7 +233,7 @@ describe('IndexerService - indexAccount', () => {
       };
 
       // Mock the cache functions from the indexer utils
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock() is hoisted; require() here accesses the mocked module after setup
       const { isCacheValid: indexerIsCacheValid } = require('@/app/utils/indexer');
       (indexerIsCacheValid as jest.Mock).mockReturnValue(true);
       (getCacheEntry as jest.Mock).mockResolvedValue(cachedResult);

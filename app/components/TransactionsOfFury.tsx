@@ -88,7 +88,7 @@ const TransactionsOfFury: React.FC = () => {
 
   return (
     <StoryShell>
-      <div className="relative w-full h-screen overflow-hidden bg-[#030b0a]" style={{ touchAction: "pan-y" }}>
+      <div className="relative w-full min-h-screen overflow-x-hidden bg-[#030b0a]" style={{ touchAction: "pan-y" }}>
         <div className="absolute inset-0">
           {[...Array(80)].map((_, i) => (
             <motion.div
@@ -160,7 +160,7 @@ const TransactionsOfFury: React.FC = () => {
         />
 
         {/* Content Container */}
-        <div className="relative z-10 flex flex-col items-center justify-center h-full px-6 md:px-12">
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 md:px-12">
           {/* Home Button */}
           <div className="absolute top-4 left-4 sm:top-6 sm:left-6 md:top-8 md:left-8">
             <button
@@ -208,7 +208,7 @@ const TransactionsOfFury: React.FC = () => {
               <div className="absolute inset-0 blur-[60px] sm:blur-[80px] bg-emerald-500/30 animate-pulse" />
               
               <motion.h1
-                className="relative text-[6rem] sm:text-[8rem] md:text-[12rem] lg:text-[16rem] xl:text-[20rem] font-black tracking-tighter leading-none focus:outline-none"
+                className="relative text-[clamp(2.5rem,12vw,6rem)] sm:text-[8rem] md:text-[12rem] lg:text-[16rem] xl:text-[20rem] font-black tracking-tighter leading-none focus:outline-none"
                 aria-label={`${displayCount} transactions`}
               >
                 <span 

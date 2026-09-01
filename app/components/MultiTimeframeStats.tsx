@@ -9,15 +9,20 @@
  * Issue #46
  */
 
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import {
   useMultiTimeframeStore,
   selectIsComplete,
   selectFailedTimeframes,
 } from "@/app/store/multiTimeframeStore";
 import { TIMEFRAME_LABELS, Timeframe } from "@/app/services/multiTimeframeIndexer";
-import { WeeklyComparisonChart } from "@/app/components/WeeklyComparisonChart";
 import { useWrapStore } from "@/app/store/wrapStore";
+
+const WeeklyComparisonChart = lazy(() =>
+  import("@/app/components/WeeklyComparisonChart").then((m) => ({
+    default: m.WeeklyComparisonChart,
+  })),
+);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -285,11 +290,17 @@ export function MultiTimeframeStats() {
               ? "📊 Recent Activity (last 4 weeks of your 2026 year)"
               : "📊 Weekly Activity (current week vs last 4 weeks)"}
           </h3>
-          <WeeklyComparisonChart
-            tx1w={results["1w"].data!.totalTransactions}
-            tx2w={results["2w"].data!.totalTransactions}
-            tx1m={results["1m"].data!.totalTransactions}
-          />
+          <Suspense
+            fallback={
+              <div className="h-32 rounded-xl bg-white/5 animate-pulse" aria-hidden="true" />
+            }
+          >
+            <WeeklyComparisonChart
+              tx1w={results["1w"].data!.totalTransactions}
+              tx2w={results["2w"].data!.totalTransactions}
+              tx1m={results["1m"].data!.totalTransactions}
+            />
+          </Suspense>
         </div>
       )}
     </div>

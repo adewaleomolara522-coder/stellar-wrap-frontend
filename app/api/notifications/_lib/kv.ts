@@ -1,73 +1,11 @@
 /**
  * KV storage abstraction for notification data.
- *
- * Uses Vercel KV (@vercel/kv) when the environment variables are present,
- * falling back to a lightweight in-process Map for local development and tests.
- *
- * Install Vercel KV when deploying:
- *   pnpm add @vercel/kv   (or yarn add @vercel/kv)
- * Then set KV_REST_API_URL and KV_REST_API_TOKEN in your environment.
+ * Re-exports the shared KV storage abstraction.
  */
 
-// Lazy-import so the package is optional at build time
-async function getKv() {
-  if (
-    process.env.KV_REST_API_URL &&
-    process.env.KV_REST_API_TOKEN
-  ) {
-    const mod = await import("@vercel/kv");
-    return mod.kv;
-  }
-  return localKv;
-}
-
-// ─── In-process fallback (dev / test) ────────────────────────────────────────
-
-const store = new Map<string, unknown>();
-
-const localKv = {
-  async get<T>(key: string): Promise<T | null> {
-    return (store.get(key) as T) ?? null;
-  },
-  async set(key: string, value: unknown): Promise<void> {
-    store.set(key, value);
-  },
-  async del(key: string): Promise<void> {
-    store.delete(key);
-  },
-  async keys(pattern: string): Promise<string[]> {
-    const prefix = pattern.replace("*", "");
-    return [...store.keys()].filter((k) => k.startsWith(prefix));
-  },
-};
-
-// ─── Public helpers ───────────────────────────────────────────────────────────
-
-export async function kvGet<T>(key: string): Promise<T | null> {
-  const kv = await getKv();
-  return kv.get<T>(key);
-}
-
-export async function kvSet(key: string, value: unknown): Promise<void> {
-  const kv = await getKv();
-  // @vercel/kv uses set(key, value), local uses set(key, value)
-  await kv.set(key, value);
-}
-
-export async function kvDel(key: string): Promise<void> {
-  const kv = await getKv();
-  await kv.del(key);
-}
-
-export async function kvKeys(pattern: string): Promise<string[]> {
-  const kv = await getKv();
-  return kv.keys(pattern);
-}
+export * from "../../_lib/kv";
 
 export const SUB_KEY = (wallet: string) => `notif:sub:${wallet}`;
-export const LOG_KEY = (
-  wallet: string,
-  channel: string,
-  period: string,
-  periodKey: string,
-) => `notif:log:${wallet}:${channel}:${period}:${periodKey}`;
+export const PERIOD_KEY = (period: string) => `notif:period:${period}`;
+export const LOG_KEY = (wallet: string, channel: string, period: string, periodKey: string) =>
+  `notif:log:${wallet}:${channel}:${period}:${periodKey}`;

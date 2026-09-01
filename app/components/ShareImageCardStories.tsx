@@ -15,14 +15,26 @@ interface ShareImageCardStoriesData {
   vibes?: ShareImageCardStoriesVibe[];
 }
 
+interface ShareCardLabels {
+  stellarWrapped: string;
+  totalTransactions: string;
+  persona: string;
+  topVibe: string;
+  scanToView: string;
+  scanToViewAlt: string;
+  noVibeData: string;
+}
+
 interface ShareImageCardStoriesProps {
   themeColor: string;
   archetypeImage?: string;
   data?: ShareImageCardStoriesData;
   shareUrl?: string;
+  locale?: string;
+  labels?: ShareCardLabels;
 }
 
-export function ShareImageCardStories({ themeColor, archetypeImage, data, shareUrl }: ShareImageCardStoriesProps) {
+export function ShareImageCardStories({ themeColor, archetypeImage, data, shareUrl, labels = { stellarWrapped: "STELLAR WRAPPED 2026", totalTransactions: "TOTAL TRANSACTIONS", persona: "YOUR PERSONA", topVibe: "TOP VIBE", scanToView: "SCAN TO VIEW", scanToViewAlt: "Scan to view", noVibeData: "No vibe data" } }: ShareImageCardStoriesProps) {
   const { persona, transactions, username, vibes = [] } = data ?? mockData;
   const topVibe = vibes[0];
   const topThreeVibes = vibes.slice(0, 3);
@@ -102,7 +114,7 @@ export function ShareImageCardStories({ themeColor, archetypeImage, data, shareU
                 lineHeight: "1",
               }}
             >
-              STELLAR WRAPPED 2026
+              {labels.stellarWrapped}
             </span>
           </div>
           <h2
@@ -146,7 +158,7 @@ export function ShareImageCardStories({ themeColor, archetypeImage, data, shareU
                 color: "rgba(255, 255, 255, 0.6)",
               }}
             >
-              TOTAL TRANSACTIONS
+              {labels.totalTransactions}
             </p>
             <p
               style={{
@@ -192,7 +204,7 @@ export function ShareImageCardStories({ themeColor, archetypeImage, data, shareU
                   margin: "0 0 4px 0",
                 }}
               >
-                YOUR PERSONA
+                {labels.persona}
               </p>
               <p
                 style={{
@@ -225,7 +237,7 @@ export function ShareImageCardStories({ themeColor, archetypeImage, data, shareU
                 marginBottom: "8px",
               }}
             >
-              TOP VIBE
+              {labels.topVibe}
             </p>
             <p
               style={{
@@ -336,7 +348,7 @@ export function ShareImageCardStories({ themeColor, archetypeImage, data, shareU
             >
               <img
                 src={qrCodeUrl}
-                alt="Scan to view"
+                alt={labels.scanToViewAlt}
                 style={{
                   width: "100px",
                   height: "100px",
@@ -353,7 +365,7 @@ export function ShareImageCardStories({ themeColor, archetypeImage, data, shareU
                   letterSpacing: "0.05em",
                 }}
               >
-                SCAN TO VIEW
+                {labels.scanToView}
               </div>
             </div>
           )}

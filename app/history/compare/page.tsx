@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowUp, ArrowDown, ArrowRight } from "lucide-react";
-import { useTheme } from "@/app/context/ThemeContext";
+import { useTheme, ThemeProvider } from "@/app/context/ThemeContext";
 
 // Mock archetype icons
 const ArchetypeIcon = ({ name }: { name: string }) => {
@@ -55,7 +55,21 @@ const mockWraps = [
   },
 ];
 
+// This route lives outside app/[locale], so app/[locale]/layout.tsx's
+// ThemeProvider never wraps it (the only other layout, root app/layout.tsx,
+// deliberately renders no providers to avoid nested <html> tags with the
+// locale layout). Providing ThemeProvider locally here is the safe, scoped
+// fix — restructuring the shared layouts risks breaking the working
+// [locale] tree.
 export default function ComparePage() {
+  return (
+    <ThemeProvider>
+      <ComparePageContent />
+    </ThemeProvider>
+  );
+}
+
+function ComparePageContent() {
   const { mode } = useTheme();
   const [period1Id, setPeriod1Id] = useState(mockWraps[0].id);
   const [period2Id, setPeriod2Id] = useState(mockWraps[1].id);

@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { logger } from "@/app/utils/logger";
+
+const log = logger.child("ServiceWorkerManager");
 
 export function ServiceWorkerManager() {
   useEffect(() => {
@@ -65,7 +68,7 @@ export function ServiceWorkerManager() {
         });
       })
       .catch((error) => {
-        console.warn("[PWA] Service worker registration failed:", error);
+        log.warn("Service worker registration failed:", error);
       });
 
     return () => {

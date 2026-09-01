@@ -8,6 +8,11 @@ on:
     branches:
       - '**'
 
+# Allow the Lighthouse action to post score comments on pull requests.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   lighthouse:
     name: Lighthouse Audit
@@ -38,7 +43,12 @@ jobs:
         run: pnpm build
 
       - name: Run Lighthouse CI
-        run: pnpm lhci autorun
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: './lighthouserc.json'
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          runs: 3
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 
@@ -49,11 +59,3 @@ jobs:
           name: lighthouse-reports-${{ github.run_id }}-${{ github.run_attempt }}
           path: .lighthouseci/
           retention-days: 90
-
-      - name: Upload Lighthouse reports (PR comment)
-        uses: treosh/lighthouse-ci-action@v12
-        if: github.event_name == 'pull_request'
-        with:
-          configPath: './lighthouserc.json'
-          uploadArtifacts: true
-          temporaryPublicStorage: true

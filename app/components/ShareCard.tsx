@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { Share2, Download, Twitter, Loader2, Sparkles, AlertCircle, Film, ImagePlay, ExternalLink } from "lucide-react";
 import { useState, RefObject, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { downloadShareImage } from "../utils/imageExport";
 import {
   downloadAnimatedGif,
@@ -39,6 +40,7 @@ export function ShareCard({
   cardFormat = "square",
   onFormatChange,
 }: ShareCardProps) {
+  const t = useTranslations("ShareCard");
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [usedMainThreadFallback, setUsedMainThreadFallback] = useState(false);
@@ -65,10 +67,10 @@ export function ShareCard({
   useEffect(() => {
     if (transactionState === "confirmed" && transactionHash) {
       playSound(SOUND_NAMES.MINT_SUCCESS);
-      toast.success("Minted successfully!", {
-        description: "View your transaction on Stellar Explorer",
+      toast.success(t("mintedSuccessfully"), {
+        description: t("viewTransaction"),
         action: {
-          label: "View",
+          label: t("view"),
           onClick: () =>
             window.open(
               `https://stellar.expert/explorer/testnet/tx/${transactionHash}`,
@@ -82,11 +84,11 @@ export function ShareCard({
       // transactionError is already mapped to a friendly message in contractBridge;
       // keep the raw string in diagnostics for support/debugging.
       console.error("[ShareCard] mint failed", { transactionError });
-      toast.error("Minting failed", {
+      toast.error(t("mintingFailed"), {
         description: transactionError,
       });
     }
-  }, [transactionState, transactionHash, transactionError, playSound]);
+  }, [transactionState, transactionHash, transactionError, playSound, t]);
 
   const handleDownload = async () => {
     if (!shareImageRef.current || isDownloading) return;
@@ -100,7 +102,7 @@ export function ShareCard({
         onFallbackWarning: () => setUsedMainThreadFallback(true),
         format: cardFormat,
       });
-      console.info(
+      log.info(
         `Share image generated in ${result.durationMs}ms (scale: ${result.scale}x, worker: ${result.usedWorker})`,
       );
     } catch (error) {
@@ -109,7 +111,7 @@ export function ShareCard({
           ? error.message
           : "Failed to generate share image";
       setDownloadError(message);
-      console.error("Download failed:", error);
+      log.error("Download failed:", error);
     } finally {
       setIsDownloading(false);
     }
@@ -129,28 +131,28 @@ export function ShareCard({
     label: string,
   ) => {
     setExportLabel(label);
-    setExportProgress({ phase: "capturing", progress: 0, message: "Starting..." });
+    setExportProgress({ phase: "capturing", progress: 0, message: t("starting") });
     setIsDownloading(true);
     try {
       const onProgress = (p: AnimationExportProgress) => setExportProgress(p);
       const fallback = shareImageRef.current ?? undefined;
       if (type === "gif") {
         await downloadAnimatedGif(animationData, onProgress, fallback);
-        toast.success("GIF downloaded", {
-          description: "Optimized for Twitter, WhatsApp, and Telegram.",
+        toast.success(t("gifDownloaded"), {
+          description: t("gifDescription"),
         });
       } else {
         await downloadAnimatedVideo(animationData, onProgress, fallback);
-        toast.success("Video downloaded", {
-          description: "MP4/WebM — best for Discord and rich embeds.",
+        toast.success(t("videoDownloaded"), {
+          description: t("videoDescription"),
         });
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Export failed";
+      const msg = error instanceof Error ? error.message : t("exportFailed");
       if (msg.includes("PNG")) {
-        toast.info("Fell back to static PNG", { description: msg });
+        toast.info(t("staticPng"), { description: msg });
       } else {
-        toast.error("Animation export failed", { description: msg });
+        toast.error(t("animationExportFailed"), { description: msg });
         if (shareImageRef.current) {
           await downloadShareImage(shareImageRef.current);
         }
@@ -170,17 +172,17 @@ export function ShareCard({
   };
 
   const handleMint = async () => {
-    console.log("Mint attempt - Address:", address);
+    log.debug("Mint attempt", { address });
 
     if (!isOnline) {
-      toast.error("Minting is unavailable offline");
+      toast.error(t("mintingOffline"));
       return;
     }
 
     if (!address) {
-      toast.error("Please connect your wallet first", {
+      toast.error(t("connectWalletFirst"), {
         action: {
-          label: "Connect Wallet",
+          label: t("connectWallet"),
           onClick: () => (window.location.href = "/connect"),
         },
       });
@@ -195,7 +197,7 @@ export function ShareCard({
 
     // Transaction state observer
     const observer = (state: string, data?: unknown) => {
-      console.log("Transaction state:", state, data);
+      log.debug("Transaction state:", state, data);
 
       // Track per-tick confirming progress
       if (
@@ -204,7 +206,7 @@ export function ShareCard({
         typeof data === 'object' &&
         'confirming' in data
       ) {
-        const d = data as { attempt: number; maxAttempts: number };
+        const d = data as unknown as { attempt: number; maxAttempts: number };
         setConfirmingAttempt(d.attempt);
         return; // don't propagate as a state change — still "submitted" in the store
       }
@@ -225,8 +227,8 @@ export function ShareCard({
       if (state === 'simulating' && data && typeof data === 'object' && 'simulation' in data) {
         const simulation = (data as { simulation: { success?: boolean; estimatedFee?: number } }).simulation;
         if (simulation?.success && simulation?.estimatedFee) {
-          toast.info("Transaction simulation successful", {
-            description: `Estimated fee: ${simulation.estimatedFee.toFixed(7)} XLM`,
+          toast.info(t("transactionSimulationSuccessful"), {
+            description: t("estimatedFee", { fee: simulation.estimatedFee.toFixed(7) }),
           });
         }
       }
@@ -243,32 +245,32 @@ export function ShareCard({
     } catch (error) {
       // Errors are handled by transactionObserver setting state to 'failed'
       // which triggers the useEffect to show a toast, so we just log raw details here.
-      console.error("Minting process caught error:", error);
+      log.error("Minting process caught error:", error);
     }
   };
 
   const getMintButtonText = () => {
     switch (transactionState) {
       case "building":
-        return "Building transaction...";
+        return t("buildingTransaction");
       case "simulating":
-        return "Simulating transaction...";
+        return t("simulatingTransaction");
       case "signing":
-        return "Awaiting wallet signature...";
+        return t("awaitingSignature");
       case "submitting":
         return confirmingAttempt !== null
-          ? `Confirming… attempt ${confirmingAttempt} / 60`
-          : "Submitting transaction...";
+          ? t("confirmingAttempt", { attempt: confirmingAttempt })
+          : t("submittingTransaction");
       case "confirming":
         return confirmingAttempt !== null
-          ? `Confirming… attempt ${confirmingAttempt} / 60`
-          : "Confirming transaction...";
+          ? t("confirmingAttempt", { attempt: confirmingAttempt })
+          : t("confirmingTransaction");
       case "confirmed":
-        return "Minted!";
+        return t("minted");
       case "failed":
-        return confirmingTimedOut ? "Retry Mint" : "Retry Mint";
+        return confirmingTimedOut ? t("retryMint") : t("retryMint");
       default:
-        return isOnline ? "Mint My Wrap" : "Mint unavailable offline";
+        return isOnline ? t("mintWrap") : t("mintUnavailableOffline");
     }
   };
   return (
@@ -348,7 +350,7 @@ export function ShareCard({
                           }}
                         />
                         <span className="text-xs sm:text-sm font-black text-white/70 tracking-[0.2em] truncate">
-                          STELLAR WRAPPED 2026
+                          {t("stellarWrapped")}
                         </span>
                       </div>
                       <h2 className="text-2xl sm:text-3xl font-black text-white mb-2 truncate">
@@ -366,7 +368,7 @@ export function ShareCard({
                         transition={{ delay: 0.5 }}
                       >
                         <p className="text-xs sm:text-sm font-bold text-white/60 mb-2">
-                          Total Transactions
+                          {t("totalTransactions")}
                         </p>
                         <p className="text-4xl sm:text-6xl font-black text-white break-words">
                           {transactions}
@@ -381,7 +383,7 @@ export function ShareCard({
                         transition={{ delay: 0.6 }}
                       >
                         <p className="text-xs sm:text-sm font-bold text-white/60 mb-2">
-                          Persona
+                          {t("persona")}
                         </p>
                         <p
                           className="text-2xl sm:text-3xl font-black truncate"
@@ -403,7 +405,7 @@ export function ShareCard({
                         transition={{ delay: 0.7 }}
                       >
                         <p className="text-xs sm:text-sm font-bold text-white/60 mb-2">
-                          Top Vibe
+                          {t("topVibe")}
                         </p>
                         <p className="text-xl sm:text-2xl font-black text-white break-words">
                           {vibePercentage}% {topVibe}
@@ -592,7 +594,7 @@ export function ShareCard({
                 whileTap={{ scale: 0.95 }}
               >
                 <Film className="w-4 h-4" />
-                <span className="text-sm font-bold">Square</span>
+                <span className="text-sm font-bold">{t("square")}</span>
               </motion.button>
               <motion.button
                 onClick={() => onFormatChange?.("stories")}
@@ -605,7 +607,7 @@ export function ShareCard({
                 whileTap={{ scale: 0.95 }}
               >
                 <ImagePlay className="w-4 h-4" />
-                <span className="text-sm font-bold">Stories</span>
+                <span className="text-sm font-bold">{t("stories")}</span>
               </motion.button>
             </motion.div>
 
@@ -630,7 +632,7 @@ export function ShareCard({
                 <div className="relative flex items-center gap-4 bg-white text-black px-8 py-6 rounded-2xl border border-white/20">
                   <Share2 className="w-6 h-6" aria-hidden="true" />
                   <span className="text-2xl font-black tracking-tight">
-                    Share to Social
+                    {t("shareToSocial")}
                   </span>
                 </div>
               </motion.button>
@@ -662,7 +664,7 @@ export function ShareCard({
                 >
                   <Twitter className="w-6 h-6" aria-hidden="true" />
                   <span className="text-2xl font-black tracking-tight">
-                    Post to X
+                    {t("postToX")}
                   </span>
                 </div>
               </motion.button>
@@ -696,8 +698,8 @@ export function ShareCard({
                   )}
                   <span className="text-2xl font-black tracking-tight">
                     {isDownloading && exportLabel === "GIF"
-                      ? exportProgress?.message ?? "Encoding GIF..."
-                      : "Download as GIF"}
+                      ? exportProgress?.message ?? t("encodingGif")
+                      : t("downloadGif")}
                   </span>
                 </div>
               </motion.button>
@@ -731,8 +733,8 @@ export function ShareCard({
                   )}
                   <span className="text-2xl font-black tracking-tight">
                     {isDownloading && exportLabel === "Video"
-                      ? exportProgress?.message ?? "Recording..."
-                      : "Download as Video"}
+                      ? exportProgress?.message ?? t("recording")
+                      : t("downloadVideo")}
                   </span>
                 </div>
               </motion.button>
@@ -795,8 +797,8 @@ export function ShareCard({
                   )}
                   <span className="text-2xl font-black tracking-tight">
                     {isDownloading
-                      ? "Generating your card..."
-                      : "Download Image"}
+                      ? t("generatingCard")
+                      : t("downloadImage")}
                   </span>
                 </div>
               </motion.button>
@@ -835,7 +837,7 @@ export function ShareCard({
               transition={{ delay: 1.2 }}
               className="mt-8 text-lg font-bold" style={{ color: mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}
             >
-              Show the world your Stellar journey
+              {t("showJourney")}
             </motion.p>
           </motion.div>
         </div>

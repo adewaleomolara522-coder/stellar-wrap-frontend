@@ -6,12 +6,14 @@
  * Integrates with asset resolver to show proper asset names and logos
  */
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { IndexerResult } from "@/app/utils/indexer";
-import { AssetMetadata } from "@/app/types/asset";
-import { resolveAsset } from "@/app/services/assetResolver";
+import { useAssetQuery } from "@/app/hooks/useAssetQuery";
 import { AssetDisplay, AssetBadge } from "./AssetDisplay";
 import { Sparkles } from "lucide-react";
+import { logger } from "@/app/utils/logger";
+
+const log = logger.child("AchievementDisplay");
 
 interface AchievementDisplayProps {
   result: IndexerResult | null;
@@ -25,27 +27,9 @@ export const AchievementDisplay: React.FC<AchievementDisplayProps> = ({
   result,
   loading = false,
 }) => {
-  const [mostActiveAssetMetadata, setMostActiveAssetMetadata] =
-    useState<AssetMetadata | null>(null);
-  const [resolving, setResolving] = useState(false);
-
-  useEffect(() => {
-    if (!result || !result.mostActiveAsset) return;
-
-    const resolveMostActiveAsset = async () => {
-      setResolving(true);
-      try {
-        const metadata = await resolveAsset(result.mostActiveAsset);
-        setMostActiveAssetMetadata(metadata);
-      } catch (error) {
-        console.error("Failed to resolve most active asset:", error);
-      } finally {
-        setResolving(false);
-      }
-    };
-
-    resolveMostActiveAsset();
-  }, [result]);
+  const { data: mostActiveAssetMetadata, isLoading: resolving } = useAssetQuery(
+    result?.mostActiveAsset ?? "",
+  );
 
   if (loading || !result) {
     return (

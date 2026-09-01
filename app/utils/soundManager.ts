@@ -1,4 +1,7 @@
 import { useSoundStore } from "../store/soundStore";
+import { logger } from "./logger";
+
+const log = logger.child("soundManager");
 
 
 export const SOUND_NAMES = {
@@ -111,7 +114,7 @@ class SoundManager {
       ) {
         return;
       }
-      console.warn(`Failed to play sound ${soundName}:`, error);
+      log.warn(`Failed to play sound ${soundName}:`, error);
     });
 
     audio.onended = () => {
@@ -123,8 +126,13 @@ class SoundManager {
     if (typeof window === "undefined") return null;
     
     if (!this.audioContext) {
-      // eslint-disable-next-line
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // webkitAudioContext is a vendor-prefixed fallback for older Safari/iOS browsers
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextCtor) {
+        this.audioContext = new AudioContextCtor();
+      }
     }
     
     return this.audioContext;
@@ -238,7 +246,7 @@ class SoundManager {
         this.bgMusicSource.onended = null;
         this.bgMusicSource.stop();
       } catch (error) {
-        console.error("Failed to stop background music:", error);
+        log.error("Failed to stop background music:", error);
       }
       this.bgMusicSource = null;
     }
@@ -252,7 +260,7 @@ class SoundManager {
         this.bgMusicSource.onended = null;
         this.bgMusicSource.stop();
       } catch (error) {
-        console.error("Failed to pause background music:", error);
+        log.error("Failed to pause background music:", error);
       }
       this.bgMusicSource = null;
     }
@@ -318,7 +326,7 @@ class SoundManager {
     
     if (this.audioContext) {
       this.audioContext.close().catch((error) => {
-        console.warn("Failed to close audio context:", error);
+        log.warn("Failed to close audio context:", error);
       });
       this.audioContext = null;
     }

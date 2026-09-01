@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { mockWalletAndIndexer } from "../e2e/mockDependencies";
 
-const DEMO_ADDRESS = "GDEMOADDRESSFORSTELLARWRAPDEMOPURPOSES12345678";
+const DEMO_ADDRESS = "GDEMOADDRESSFORSTELLARSWRAPDESMOPRPTRPOSES12345678";
 
 const THEMES = [
   "green",
@@ -10,7 +10,7 @@ const THEMES = [
   "yellow",
   "red",
   "purple",
-  "cosmic-purple",
+  "cosmic-purple"
 ] as const;
 
 const MODES = ["dark", "light"] as const;
@@ -20,9 +20,9 @@ type Mode = (typeof MODES)[number];
 
 /**
  * Rules intentionally disabled and why:
- * - `color-contrast`: contrast depends on the active color theme, several of
+ * - color-contrast: contrast depends on the active color theme, several of
  *   which use brand colors below WCAG AA on purpose. Tracked in #150 follow-ups.
- * - `region`: axe flags landmarks-only content on hero/share cards; semantic
+ * - region: axe flags landmarks-only content on hero/share cards; semantic
  *   structure is fine for this marketing flow.
  */
 const DISABLED_RULES = ["color-contrast", "region"];
@@ -50,9 +50,7 @@ test.describe("axe accessibility audit (WCAG 2.1 AA)", () => {
   test.describe("landing page", () => {
     for (const color of THEMES) {
       for (const mode of MODES) {
-        test(`has no violations on / with ${color} ${mode} theme`, async ({
-          page,
-        }) => {
+        test(`has no violations on / with ${color} ${mode} theme`, async ({ page }) => {
           await setTheme(page, color, mode);
           await page.goto("/");
 
@@ -68,9 +66,7 @@ test.describe("axe accessibility audit (WCAG 2.1 AA)", () => {
   test.describe("connect page", () => {
     for (const color of THEMES) {
       for (const mode of MODES) {
-        test(`has no violations on /connect with ${color} ${mode} theme`, async ({
-          page,
-        }) => {
+        test(`has no violations on /connect with ${color} ${mode} theme`, async ({ page }) => {
           await setTheme(page, color, mode);
           await mockWalletAndIndexer(page);
           await page.goto("/connect");
@@ -91,9 +87,7 @@ test.describe("axe accessibility audit (WCAG 2.1 AA)", () => {
   test.describe("loading page", () => {
     for (const color of THEMES) {
       for (const mode of MODES) {
-        test(`has no violations on /loading with ${color} ${mode} theme`, async ({
-          page,
-        }) => {
+        test(`has no violations on /loading with ${color} ${mode} theme`, async ({ page }) => {
           await setTheme(page, color, mode);
           await page.addInitScript(
             (address) => {
@@ -128,9 +122,7 @@ test.describe("axe accessibility audit (WCAG 2.1 AA)", () => {
   test.describe("persona page", () => {
     for (const color of THEMES) {
       for (const mode of MODES) {
-        test(`has no violations on /persona with ${color} ${mode} theme`, async ({
-          page,
-        }) => {
+        test(`has no violations on /persona with ${color} ${mode} theme`, async ({ page }) => {
           await setTheme(page, color, mode);
           await page.goto("/persona");
 
@@ -146,9 +138,7 @@ test.describe("axe accessibility audit (WCAG 2.1 AA)", () => {
   test.describe("share page", () => {
     for (const color of THEMES) {
       for (const mode of MODES) {
-        test(`has no violations on /share with ${color} ${mode} theme`, async ({
-          page,
-        }) => {
+        test(`has no violations on /share with ${color} ${mode} theme`, async ({ page }) => {
           await setTheme(page, color, mode);
           await page.addInitScript(
             (address) => {
@@ -176,6 +166,47 @@ test.describe("axe accessibility audit (WCAG 2.1 AA)", () => {
               name: /View full history on Stellar.expert/i,
             }).first(),
           ).toBeVisible();
+          const violations = await runAxe(page);
+
+          expect(violations).toEqual([]);
+        });
+      }
+    }
+  });
+
+  test.describe("token selector", () => {
+    for (const color of THEMES) {
+      for (const mode of MODES) {
+        test(`has no violations on /persona token selector with ${color} ${mode} theme`, async ({ page }) => {
+          await setTheme(page, color, mode);
+          await page.addInitScript(
+            (address) => {
+              localStorage.setItem(
+                "stellar-wrap-store",
+                JSON.stringify({
+                  state: {
+                    address,
+                    period: "yearly",
+                    network: "mainnet",
+                    status: "ready",
+                    result: [
+                      { code: "USDC", issuer: "GBSTRSUD", domain: "centre.io" },
+                      { code: "XLM", issuer: "", domain: "stellar.org" },
+                    ],
+                    cacheMeta: null,
+                  },
+                  version: 0,
+                }),
+              );
+            },
+            [DEMO_ADDRESS],
+          );
+          await page.goto("/persona");
+
+          const tokenSelector = page
+            .getByRole("combobox", { name: /token/i })
+            .first();
+          await expect(tokenSelector).toBeVisible();
           const violations = await runAxe(page);
 
           expect(violations).toEqual([]);

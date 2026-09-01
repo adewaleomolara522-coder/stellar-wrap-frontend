@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Mail, Trash2, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useWrapStore } from "@/app/store/wrapStore";
 import { useNotificationStore } from "@/app/store/notificationStore";
 import { useServiceWorker } from "@/app/hooks/useServiceWorker";
+import { useDialogFocusManagement } from "@/app/hooks/useDialogFocusManagement";
 import { isValidEmail } from "@/app/utils/notifications/emailValidator";
 import type { SubscriptionRecord } from "@/app/types/notifications";
 
@@ -55,6 +56,13 @@ export default function NotificationsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [syncPending, setSyncPending] = useState(false);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+
+  useDialogFocusManagement(
+    showDeleteConfirm,
+    () => setShowDeleteConfirm(false),
+    deleteDialogRef,
+  );
 
   // Load preferences from server on mount
   useEffect(() => {
@@ -98,7 +106,7 @@ export default function NotificationsPage() {
         store.setSyncStatus("error");
         setSyncPending(true);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `store` is a stable Zustand reference; including it would cause infinite re-fetches on every store update
   }, [address]);
 
   if (!address) {
@@ -465,6 +473,8 @@ export default function NotificationsPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="delete-dialog-title"
+              aria-describedby="delete-dialog-description"
+              ref={deleteDialogRef}
             >
               <motion.div
                 initial={{ scale: 0.9 }}
@@ -475,7 +485,7 @@ export default function NotificationsPage() {
                 <h2 id="delete-dialog-title" className="font-bold text-lg text-red-400">
                   Confirm data deletion
                 </h2>
-                <p className="text-sm text-white/60">
+                <p id="delete-dialog-description" className="text-sm text-white/70">
                   This will permanently remove all your notification preferences, email
                   address, and dispatch history. This cannot be undone.
                 </p>

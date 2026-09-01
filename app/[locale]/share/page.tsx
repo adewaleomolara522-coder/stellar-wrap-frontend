@@ -1,5 +1,6 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
+import { Suspense } from "react";
 import SharePageClient from "./SharePageClient";
 import {
   buildSharePreviewSearchParams,
@@ -8,37 +9,39 @@ import {
 
 type SharePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
+  params: Promise<{ locale: string }>;
 };
 
 export async function generateMetadata({
   searchParams,
+  params: routeParams,
 }: SharePageProps): Promise<Metadata> {
+  const { locale } = await routeParams;
   const params = await searchParams;
+  const t = await getTranslations({ locale, namespace: "Og" });
   const preview = parseSharePreviewParams(params);
   const ogQuery = buildSharePreviewSearchParams(preview).toString();
-  const ogImage = `/api/og?${ogQuery}`;
+  const ogImage = `/api/og?${ogQuery}&locale=${encodeURIComponent(locale)}`;
 
   return {
-    title: `${preview.username}'s Stellar Wrap`,
-    description:
-      "Check out this Stellar blockchain year in review — transactions, DeFi persona, and vibes!",
+    title: t("title", { username: preview.username }),
+    description: t("description"),
     openGraph: {
-      title: `${preview.username}'s Stellar Wrap`,
-      description:
-        "Check out this Stellar blockchain year in review — transactions, DeFi persona, and vibes!",
+      title: t("title", { username: preview.username }),
+      description: t("description"),
       type: "article",
       images: [
         {
           url: ogImage,
           width: 1200,
           height: 1200,
-          alt: "Stellar Wrap share card",
+          alt: t("shareCardAlt"),
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${preview.username}'s Stellar Wrap`,
+      title: t("title", { username: preview.username }),
       images: [ogImage],
     },
   };

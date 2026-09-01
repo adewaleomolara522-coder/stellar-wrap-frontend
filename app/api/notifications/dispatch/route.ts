@@ -9,19 +9,20 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { kvGet, kvSet, kvKeys, SUB_KEY, LOG_KEY } from "../_lib/kv";
 import { sendEmail } from "../_lib/email";
-import { formatPushPayload } from "@/app/utils/notifications/pushPayloadFormatter";
-import { renderEmailTemplate } from "@/app/utils/notifications/emailTemplate";
+import { formatPushPayload } from "@app/utils/notifications/pushPayloadFormatter";
+import { renderEmailTemplate } from "@app/utils/notifications/emailTemplate";
 import {
   getPeriodKey,
   getActivePeriodsForNow,
-} from "@/app/utils/notifications/periodKey";
+} from "@app/utils/notifications/periodKey";
 import type {
   SubscriptionRecord,
   DispatchLogEntry,
   WrapPeriod,
-} from "@/app/types/notifications";
+} from "@app/types/notifications";
 
 const PERIOD_LABEL: Record<WrapPeriod, string> = {
   weekly: "Weekly",
@@ -61,7 +62,7 @@ async function sendPushNotification(
   const vapidSubject = process.env.VAPID_SUBJECT ?? "mailto:noreply@stellarwrapped.app";
 
   if (!vapidPrivateKey || !vapidPublicKey) {
-    console.warn("[dispatch] VAPID keys not configured — skipping push");
+    log.warn("VAPID keys not configured — skipping push");
     return;
   }
 
@@ -122,13 +123,31 @@ async function sendEmailNotification(
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  // Verify cron secret
+  // Verify cron secret — fail closed if not configured
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!cronSecret) {
+    console.error(
+      "[dispatch] CRON_SECRET is not configured — refusing to serve requests",
+    );
+    return NextResponse.json(
+      { error: "Server misconfiguration" },
+      { status: 500 },
+    );
+  }
+
+  const authHeader = request.headers.get("authorization");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : "";
+
+  const secretBuf = Buffer.from(cronSecret);
+  const tokenBuf = Buffer.from(token);
+
+  if (
+    secretBuf.length !== tokenBuf.length ||
+    !crypto.timingSafeEqual(secretBuf, tokenBuf)
+  ) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -227,7 +246,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, dispatched, periods: activePeriods });
   } catch (err) {
-    console.error("[POST /api/notifications/dispatch]", err);
+    log.error("Internal error during dispatch:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

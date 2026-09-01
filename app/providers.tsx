@@ -1,27 +1,43 @@
 "use client";
 
+import { type ReactNode, useEffect } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ServiceWorkerManager } from "./components/ServiceWorkerManager";
+import { OfflineWrapHydrator } from "./components/OfflineWrapHydrator";
+import { OfflineBanner } from "./components/OfflineBanner";
+import { PwaInstallPrompt } from "./components/PwaInstallPrompt";
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000,
+        retry: 2,
+        refetchOnWindowFocus: false,
+      },
+    },
+  }));
+
   useEffect(() => {
-    // Dynamically import walletKit so that stellar-sdk and
-    // @creit-tech/stellar-wallets-kit are NOT included in the initial
-    // landing-page bundle.  They are only loaded here, client-side, after
-    // the user's first interaction with the app.
     if (typeof window !== "undefined") {
+      import("@/app/utils/wallet").then(({ initWalletKit }) => {
         initWalletKit();
-      });
+      }).catch(console.error);
     }
   }, []);
 
   return (
-    <ThemeProvider>
-      <ServiceWorkerManager />
-      <OfflineWrapHydrator />
-      <OfflineBanner />
-      {children}
-      <PwaInstallPrompt />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <ServiceWorkerManager />
+        <OfflineWrapHydrator />
+        <OfflineBanner />
+        {children}
+        <PwaInstallPrompt />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
+

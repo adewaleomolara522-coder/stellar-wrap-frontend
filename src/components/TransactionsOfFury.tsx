@@ -238,7 +238,7 @@ const TransactionRow = memo(function TransactionRow({
 export default function TransactionsOfFury() {
   // In the current repo, this “Fury” view doesn’t exist yet as a list.
   // We keep wrapStore consumption for ZUSTAND integration.
-  const { result } = useWrapStore();
+  const { result, address } = useWrapStore();
   const totalTransactionsFromStore = result?.totalTransactions ?? 0;
 
   // Mock transaction dataset sized for 10,000+ records.
@@ -261,7 +261,7 @@ export default function TransactionsOfFury() {
     });
   }, []);
 
-  const scrollKey = useMemo(() => getStorageKey(result?.address ?? null), [result?.address]);
+  const scrollKey = useMemo(() => getStorageKey(address ?? null), [address]);
 
   const parentRef = useRef<HTMLDivElement | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -279,7 +279,7 @@ export default function TransactionsOfFury() {
     } catch {
       // ignore
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // parentRef is a React ref object; refs are stable and intentionally excluded from deps
   }, [scrollKey]);
 
   useEffect(() => {
@@ -304,17 +304,11 @@ export default function TransactionsOfFury() {
     getScrollElement: () => parentRef.current,
     estimateSize: () => (ESTIMATED_ROW_HEIGHT),
     overscan: Overscan,
-    // Variable heights support:
-    // - rows measure themselves when expanded/collapsed
-    // - measureElement is stable because each row uses a fixed DOM ref pattern
-    // tanstack/react-virtual will call this to allow measurement.
-    measureElement:
-      typeof window !== "undefined"
-        ? (element: HTMLElement | null) => {
-            if (!element) return;
-            // Measurement happens automatically; returning void is fine.
-          }
-        : undefined,
+    // Variable heights support: rows measure themselves when
+    // expanded/collapsed. Omitting measureElement uses
+    // @tanstack/react-virtual's own default implementation (real
+    // getBoundingClientRect-based measurement) rather than a custom no-op —
+    // this is what "measurement happens automatically" actually requires.
   });
 
   // Because we’re using measureElement in a generic way, we provide an explicit ref per row.
@@ -322,8 +316,8 @@ export default function TransactionsOfFury() {
   useEffect(() => {
     // Ensure virtualizer recomputes after expansions (variable height changes).
     virtualizer.measure();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedIds, virtualizer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `virtualizer` is recreated each render by useVirtualizer; adding it to deps would cause an infinite loop
+  }, [expandedIds]);
 
   const [visibleRange, setVisibleRange] = useState({
     from: 0,

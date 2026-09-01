@@ -1,12 +1,7 @@
 import createMiddleware from 'next-intl/middleware';
+import { routing } from './i18n/routing';
 
-export default createMiddleware({
-  // Supported locales
-  locales: ['en', 'es', 'fr'],
-
-  // Default locale if no matching prefix is detected
-  defaultLocale: 'en',
-});
+export default createMiddleware(routing);
 
 export const config = {
   // Match all paths except internal api, static assets (_next), and favicons

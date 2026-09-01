@@ -49,15 +49,18 @@ function parseWrapResult(val: xdr.ScVal): Partial<WrapRecord> | null {
     if (val.switch().name === "scvMap") {
       const entries = val.map();
       const record: Record<string, unknown> = {};
-      entries.forEach((entry) => {
-        const k = entry.key().str?.().toString() ?? entry.key().sym?.().toString() ?? "";
-        const v = entry.val();
-        if (v.switch().name === "scvString") record[k] = v.str().toString();
-        else if (v.switch().name === "scvU32") record[k] = v.u32();
-        else if (v.switch().name === "scvU64") record[k] = Number(v.u64());
-        else if (v.switch().name === "scvI64") record[k] = Number(v.i64());
-      });
+      if (entries) {
+        entries.forEach((entry) => {
+          const k = entry.key().str?.().toString() ?? entry.key().sym?.().toString() ?? "";
+          const v = entry.val();
+          if (v.switch().name === "scvString") record[k] = v.str().toString();
+          else if (v.switch().name === "scvU32") record[k] = v.u32();
+          else if (v.switch().name === "scvU64") record[k] = Number(v.u64());
+          else if (v.switch().name === "scvI64") record[k] = Number(v.i64());
+        });
+      }
       return {
+
         archetype: (record.archetype as string) ?? (record.persona as string),
         transactionCount: (record.transaction_count as number) ?? (record.tx_count as number) ?? 0,
         totalVolume: record.total_volume as number | undefined,

@@ -5,7 +5,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { kvGet, kvSet, SUB_KEY } from "../../_lib/kv";
+import { logger } from "@/app/utils/logger";
 import type { SubscriptionRecord } from "@/app/types/notifications";
+
+const log = logger.child("api:preferences");
 
 interface RouteParams {
   params: Promise<{ wallet: string }>;
@@ -31,7 +34,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(record, { status: 200 });
   } catch (err) {
-    console.error("[GET /api/notifications/preferences]", err);
+    log.error("Error reading notification preferences:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -64,7 +67,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(updated, { status: 200 });
   } catch (err) {
-    console.error("[PUT /api/notifications/preferences]", err);
+    log.error("Error updating notification preferences:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

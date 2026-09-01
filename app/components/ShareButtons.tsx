@@ -3,7 +3,7 @@
 import { motion } from 'motion/react';
 import { Share2, X, Link2, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useNativeShare } from '../hooks/useNativeShare';
+import { useNativeShare, nativeShare } from '../hooks/useNativeShare';
 import { trackEvent } from '../utils/plausible';
 
 interface ShareButtonsProps {
@@ -44,6 +44,7 @@ export function ShareButtons({
   const [shareOgUrl, setShareOgUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const { isSupported: canNativeShare } = useNativeShare();
 
   const handleCopyLink = async () => {
     if (typeof window === 'undefined' || !shareUrl) return;
@@ -141,6 +142,18 @@ export function ShareButtons({
 
     // Unsupported payload or a genuine failure: fall back to the social menu.
     setIsOpen(true);
+  };
+
+  // The always-visible main button: closes the menu if it's already open
+  // (matches the icon's rotate-to-X animation below), otherwise tries
+  // native share first, falling back to opening the menu via
+  // handleNativeShare's own unsupported/failure handling.
+  const handlePrimaryShare = async () => {
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+    await handleNativeShare();
   };
 
   return (

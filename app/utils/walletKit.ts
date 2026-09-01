@@ -11,6 +11,9 @@ import {
 } from "./contractErrors";
 import { mintWrap as contractMintWrap, type MintWrapOptions, type TransactionObserver } from "../../src/services/contractBridge";
 import { useTransactionStore } from "../store/transactionStore";
+import { logger } from "./logger";
+
+const log = logger.child("walletKit");
 
 if (
   typeof process !== "undefined" &&
@@ -18,8 +21,8 @@ if (
   !process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_TESTNET &&
   !process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
 ) {
-  console.warn(
-    "⚠️ No contract address env set (NEXT_PUBLIC_CONTRACT_ADDRESS_MAINNET, NEXT_PUBLIC_CONTRACT_ADDRESS_TESTNET, or NEXT_PUBLIC_CONTRACT_ADDRESS). Using placeholder per network.",
+  log.warn(
+    "No contract address env set (NEXT_PUBLIC_CONTRACT_ADDRESS_MAINNET, NEXT_PUBLIC_CONTRACT_ADDRESS_TESTNET, or NEXT_PUBLIC_CONTRACT_ADDRESS). Using placeholder per network.",
   );
 }
 
@@ -232,7 +235,7 @@ export async function mintWrap(params: MintWrapParams): Promise<string> {
       const mapped = mapContractError(error);
       const userMessage =
         mapped.code !== "Unknown" ? mapped.userMessage : error.message;
-      console.error("[walletKit] mint failed", { code: mapped.code, raw: mapped.raw });
+      log.error("mint failed", { code: mapped.code, raw: mapped.raw });
       useTransactionStore.getState().setTransactionError(userMessage);
       throw new Error(`Minting failed: ${userMessage}`);
     }

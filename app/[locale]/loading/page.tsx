@@ -18,14 +18,21 @@ import { SOUND_NAMES } from "../../utils/soundManager";
 import { indexAccount } from "../../services/indexerService";
 import { IndexerEventEmitter } from "../../utils/indexerEventEmitter";
 import { isZeroActivityResult } from "../../utils/zeroActivity";
-import { beginIndexingAbortScope, abortIndexingRequests, clearIndexingAbortScope } from "../../utils/indexingAbort";
+import {
+  beginIndexingAbortScope,
+  abortIndexingRequests,
+  clearIndexingAbortScope,
+  isAbortError,
+} from "../../utils/indexingAbort";
 import { trackEvent } from "../../utils/plausible";
 import { ZeroActivityEmptyState } from "../../components/ZeroActivityEmptyState";
-
-// Sensitive logs: use indexerDebug — never log wallet addresses in production
-// (see docs/sensitive-logging.md)
-
-const DEMO_ADDRESS = "GDEMOADDRESSFORSTELLARWRAPDEMOPURPOSES12345678";
+import { DEMO_STELLAR_ADDRESS, isDemoMode } from "@/app/data/demoAccount";
+import {
+  getMostRecentCachedData,
+  parseCachedDataKey,
+} from "@/app/services/cacheService";
+import { mapIndexerResultToWrapResult } from "@/app/utils/wrapResultMapper";
+import { type IndexerResult } from "@/app/utils/indexer";
 
 export default function LoadingScreen() {
   const router = useRouter();
@@ -147,11 +154,17 @@ export default function LoadingScreen() {
         // Call real indexer service - will emit step progress events
         let result: WrapResult | null = null;
 
-        if (address === DEMO_ADDRESS) {
+        if (isDemoMode() || address === DEMO_STELLAR_ADDRESS) {
           await emitProgressThroughSteps();
           result = mapIndexerResultToWrapResult({
+            accountId: DEMO_ADDRESS,
             totalTransactions: 42,
+            totalVolume: 0,
+            mostActiveAsset: "XLM",
+            contractCalls: 0,
+            gasSpent: 0,
             dapps: [],
+            vibes: [],
             largestTransaction: { amount: 1000, assetCode: "XLM" },
           });
         } else if (address) {

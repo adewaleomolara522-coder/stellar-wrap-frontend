@@ -7,6 +7,10 @@
  * Install: yarn add resend
  */
 
+import { logger } from "@/app/utils/logger";
+
+const log = logger.child("email");
+
 interface SendEmailOptions {
   to: string;
   subject: string;
@@ -18,9 +22,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   const from = process.env.EMAIL_FROM ?? "Stellar Wrapped <noreply@stellarwrapped.app>";
 
   if (!process.env.RESEND_API_KEY) {
-    // Local dev fallback — just log
-    console.log("[email] Would send to:", to);
-    console.log("[email] Subject:", subject);
+    // Local dev fallback — log at debug level only
+    log.debug("Would send email:", { to, subject });
     return;
   }
 

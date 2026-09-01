@@ -52,6 +52,7 @@ function info(message) {
 const REQUIRED_ENV_VARS = [
   'NEXT_PUBLIC_CONTRACT_ADDRESS_MAINNET',
   'NEXT_PUBLIC_CONTRACT_ADDRESS_TESTNET',
+  'CRON_SECRET',
 ];
 
 // Optional but recommended environment variables

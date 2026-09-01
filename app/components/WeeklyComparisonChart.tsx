@@ -3,7 +3,7 @@
 /**
  * WeeklyComparisonChart
  *
- * Pure-SVG responsive bar chart comparing weekly transaction activity
+ * Pure-SGV responsive bar chart comparing weekly transaction activity
  * derived from the 1w / 2w / 1m multi-timeframe results.
  *
  * Data derivation:
@@ -48,13 +48,13 @@ export function WeeklyComparisonChart({ tx1w, tx2w, tx1m }: WeeklyComparisonChar
 
   return (
     <div className="w-full" aria-label="Weekly transaction comparison chart">
-      {/* SVG chart — uses viewBox so it scales at all breakpoints */}
+      {/* SVG chart - maintains aspect ratio for distortion-free scaling */}
       <svg
         viewBox="0 0 400 160"
-        preserveAspectRatio="none"
-        className="w-full h-32 sm:h-40"
+        className="h-auto w-full"
         role="img"
         aria-label="Bar chart showing weekly transactions"
+        focusable="false"
       >
         {/* Gridlines */}
         {[0.25, 0.5, 0.75, 1].map((ratio) => {
@@ -66,7 +66,7 @@ export function WeeklyComparisonChart({ tx1w, tx2w, tx1m }: WeeklyComparisonChar
               y1={y}
               x2={400}
               y2={y}
-              stroke="rgba(255,255,255,0.07)"
+              className="stroke-gray-200 dark:stroke-gray-800"
               strokeWidth={1}
             />
           );
@@ -87,8 +87,8 @@ export function WeeklyComparisonChart({ tx1w, tx2w, tx1m }: WeeklyComparisonChar
                 y={20}
                 width={barW}
                 height={120}
-                rx={6}
-                fill="rgba(255,255,255,0.04)"
+                rz={6}
+                className="fill-gray-100 dark:fill-gray-800"
               />
               {/* Filled bar */}
               <rect
@@ -96,8 +96,12 @@ export function WeeklyComparisonChart({ tx1w, tx2w, tx1m }: WeeklyComparisonChar
                 y={y}
                 width={barW}
                 height={barHeight}
-                rx={6}
-                fill={week.isCurrent ? "#10b981" : "rgba(16,185,129,0.4)"}
+                rz={6}
+                className={
+                  week.isCurrent
+                    ? "fill-emerald-500"
+                    : "fill-emerald-500/40 dark:fill-emerald-400/30"
+                }
               />
               {/* Value label */}
               {week.value > 0 && (
@@ -106,7 +110,7 @@ export function WeeklyComparisonChart({ tx1w, tx2w, tx1m }: WeeklyComparisonChar
                   y={y - 4}
                   textAnchor="middle"
                   fontSize={10}
-                  fill="rgba(255,255,255,0.7)"
+                  className="fill-gray-600 dark:fill-gray-400"
                 >
                   {week.value}
                 </text>
@@ -116,16 +120,23 @@ export function WeeklyComparisonChart({ tx1w, tx2w, tx1m }: WeeklyComparisonChar
         })}
 
         {/* Baseline */}
-        <line x1={0} y1={140} x2={400} y2={140} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+        <line
+          x1={0}
+          y1={140}
+          x2={400}
+          y2={140}
+          className="stroke-gray-300 dark:stroke-gray-600"
+          strokeWidth={1}
+        />
       </svg>
 
       {/* X-axis labels */}
-      <div className="flex justify-around mt-1">
+      <div className="mt-1 flex justify-around">
         {weeks.map((week) => (
           <span
             key={week.label}
-            className={`text-[10px] sm:text-xs text-center ${
-              week.isCurrent ? "text-emerald-400 font-semibold" : "text-gray-500"
+            className={`text-center text-[10px] sm:text-xs ${
+              week.isCurrent ? "font-semibold text-emerald-500" : "text-gray-500 dark:text-gray-400"
             }`}
           >
             {week.label}

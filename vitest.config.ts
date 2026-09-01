@@ -6,9 +6,9 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: [
-      "**/__tests__/**/*.comprehensive.test.ts",
-      "**/__tests__/**/*.edge.test.ts",
-      "**/__tests__/**/*.integration.test.ts",
+      "**/__tests__/**/*.comprehensive.test.[jt]s?(x)",
+      "**/__tests__/**/*.edge.test.[jt]s?(x)",
+      "**/__tests__/**/*.integration.test.[jt]s?(x)",
     ],
     coverage: {
       provider: 'v8',

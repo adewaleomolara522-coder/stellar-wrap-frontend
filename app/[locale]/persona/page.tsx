@@ -1,12 +1,14 @@
 "use client";
 
-import React, { JSX, useCallback, useEffect, useRef, useState } from "react";
-import { PersonaRarityChart } from "@/app/components/PersonaRarityChart";
+import React, { JSX, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { motion, useAnimation, AnimatePresence } from "framer-motion";
 import { Home, Share2, ChevronRight, X, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { readStreamableValue } from "ai/rsc";
-import { getArchetypeDescription } from "@/src/data/archetypeConfig";
+import {
+  getArchetypeDescription,
+  ARCHETYPE_TRANSLATION_KEYS,
+} from "@/src/data/archetypeConfig";
 import {
   useReducedMotion,
   reducedMotionTransition,
@@ -20,9 +22,22 @@ import { useSound } from "@/app/hooks/useSound";
 import { SOUND_NAMES } from "@/app/utils/soundManager";
 import { ProgressIndicator } from "@/app/components/ProgressIndicator";
 import { MuteToggle } from "@/app/components/MuteToggle";
-import { PersonaEvolutionTimeline } from "@/app/components/PersonaEvolutionTimeline";
 import { NotificationPrompt } from "@/app/components/NotificationPrompt";
 import { generatePersonaDescription } from "@/app/actions/generate-persona";
+import { AssetList } from "@/app/components/AssetList";
+import { CsvExportButton } from "@/app/components/CsvExportButton";
+
+const PersonaEvolutionTimeline = lazy(() =>
+  import("@/app/components/PersonaEvolutionTimeline").then((m) => ({
+    default: m.PersonaEvolutionTimeline,
+  })),
+);
+
+const PersonaRarityChart = lazy(() =>
+  import("@/app/components/PersonaRarityChart").then((m) => ({
+    default: m.PersonaRarityChart,
+  })),
+);
 
 // Removed theme system - using standard CSS variables from globals.css
 const useConfetti = (color?: string, enabled = true) => {
@@ -121,38 +136,20 @@ const useTypewriter = (text: string, speed = 30, startDelay = 0) => {
   return displayedText;
 };
 
-// --- Custom Social Icons (SVG paths to match brand logos exactly) ---
+import {
+  XIcon,
+  WhatsAppIcon,
+  FacebookIcon,
+  LinkedInIcon,
+  TelegramIcon,
+} from "@/app/components/SocialIcons";
+
 const SocialIcons = {
-  X: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  ),
-  WhatsApp: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-white" aria-hidden="true">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-    </svg>
-  ),
-  Facebook: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-white" aria-hidden="true">
-      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-    </svg>
-  ),
-  LinkedIn: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white" aria-hidden="true">
-      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9H12.76v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-    </svg>
-  ),
-  Telegram: () => (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className="w-6 h-6 text-white ml-[-2px]"
-      aria-hidden="true"
-    >
-      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.638z" />
-    </svg>
-  ),
+  X: XIcon,
+  WhatsApp: WhatsAppIcon,
+  Facebook: FacebookIcon,
+  LinkedIn: LinkedInIcon,
+  Telegram: TelegramIcon,
 };
 
 export default function ArchetypeReveal(): JSX.Element {
@@ -162,6 +159,10 @@ export default function ArchetypeReveal(): JSX.Element {
   const [streamedDescription, setStreamedDescription] = useState<string>("");
   const [showTooltip, setShowTooltip] = useState<boolean>(false);
   const { playSound } = useSound();
+
+  // i18n
+  const t = useTranslations("Persona");
+  const locale = useLocale();
 
   // Menu states
   const [shareOpen, setShareOpen] = useState<boolean>(false); // Share menu
@@ -178,6 +179,12 @@ export default function ArchetypeReveal(): JSX.Element {
   const notificationStore = useNotificationStore();
   const [showNotifPrompt, setShowNotifPrompt] = useState<boolean>(true);
   const archetypeKey = result?.persona || "The Wizard";
+  // Translate the archetype display name — falls back to the raw key if not found
+  const archetypeTranslationKey =
+    ARCHETYPE_TRANSLATION_KEYS[archetypeKey] ?? "theWizard";
+  const translatedArchetypeName = t(
+    `archetypes.${archetypeTranslationKey}` as Parameters<typeof t>[0]
+  );
 
   // Suppress prompt if dismissed this session
   useEffect(() => {
@@ -214,7 +221,7 @@ export default function ArchetypeReveal(): JSX.Element {
           totalDapps: result.dapps?.length,
         };
 
-        const response = await generatePersonaDescription(metrics);
+        const response = await generatePersonaDescription(metrics, locale);
 
         let fullText = "";
         for await (const chunk of readStreamableValue(response)) {
@@ -226,7 +233,7 @@ export default function ArchetypeReveal(): JSX.Element {
         }
       } catch (error) {
         if (cancelled) return;
-        console.error("Failed to generate persona:", error);
+        log.error("Failed to generate persona:", error);
         // Fall back to existing description
         setStreamedDescription(result?.personaDescription || data.description);
       }
@@ -237,7 +244,7 @@ export default function ArchetypeReveal(): JSX.Element {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits `streamedDescription` and stable setters; re-running on those would cause an infinite loop
   }, [result]);
 
   const handleShareKeyDown = (platform: string) => (e: React.KeyboardEvent) => {
@@ -338,7 +345,7 @@ export default function ArchetypeReveal(): JSX.Element {
 
   useEffect(() => {
     runRevealAnimation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once on mount; runRevealAnimation is stable via useCallback
   }, []);
 
   const handleCardTap = () => {
@@ -348,7 +355,7 @@ export default function ArchetypeReveal(): JSX.Element {
   // --- Share Functionality ---
   const handleShare = (platform: string) => {
     const url = window.location.href;
-    const text = `I got ${archetypeKey} in the Archetype Reveal! ${data.description}`;
+    const text = `I got ${translatedArchetypeName} in the Archetype Reveal! ${data.description}`;
     let shareUrl = "";
 
     switch (platform) {
@@ -392,7 +399,7 @@ export default function ArchetypeReveal(): JSX.Element {
             style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
           >
             <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-            View history on Stellar.expert
+            {t("viewHistoryLink")}
           </a>
         )}
       </div>
@@ -451,7 +458,7 @@ export default function ArchetypeReveal(): JSX.Element {
 
           {/* --- TOP ROW --- */}
           {/* Home Button - Absolute positioned like share page */}
-          <Link href="/" aria-label="Go to home page">
+          <Link href="/" aria-label={t("goHomeAriaLabel")}>
             <motion.button
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -465,7 +472,7 @@ export default function ArchetypeReveal(): JSX.Element {
               transition={{ delay: 0.2 }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              aria-label="Go home"
+              aria-label={t("homeButtonAriaLabel")}
             >
               <div
                 className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-3 rounded-xl backdrop-blur-xl border border-white/20"
@@ -476,7 +483,7 @@ export default function ArchetypeReveal(): JSX.Element {
                   aria-hidden="true"
                 />
                 <span className="text-xs md:text-sm font-black text-white/80 group-hover:text-white transition-colors hidden sm:inline">
-                  HOME
+                  {t("homeLabel")}
                 </span>
               </div>
             </motion.button>
@@ -518,7 +525,7 @@ export default function ArchetypeReveal(): JSX.Element {
                 />
               </div>
               <h3 className="relative text-xs sm:text-2xl font-bold uppercase tracking-[0.3em] sm:tracking-[0.7em] text-gray-200 mix-blend-screen whitespace-nowrap">
-                The Oracle Has Spoken
+                {t("oracleHeading")}
               </h3>
             </div>
           </div>
@@ -543,7 +550,7 @@ export default function ArchetypeReveal(): JSX.Element {
               ref={cardRef}
               role="button"
               tabIndex={0}
-              aria-label={`${archetypeKey} persona reveal card. ${result?.totalTransactions ?? 0} transactions, ${result?.percentile ?? 0} percentile. Tap to replay persona reveal. Long press or hover to see archetype description.`}
+              aria-label={`${translatedArchetypeName} persona reveal card. ${result?.totalTransactions ?? 0} transactions, ${result?.percentile ?? 0} percentile. Tap to replay persona reveal. Long press or hover to see archetype description.`}
               onClick={(e) => {
                 if (isFlipped && !showTooltip) {
                   setShowTooltip(true);
@@ -639,7 +646,7 @@ export default function ArchetypeReveal(): JSX.Element {
                       "linear-gradient(to bottom, #fff, var(--color-theme-primary), rgba(var(--color-theme-primary-rgb), 0.6))",
                   }}
                 >
-                  {archetypeKey}
+                  {translatedArchetypeName}
                 </h1>
               </div>
             </motion.div>
@@ -649,6 +656,8 @@ export default function ArchetypeReveal(): JSX.Element {
               {showTooltip && (
                 <motion.div
                   ref={tooltipRef}
+                  role="tooltip"
+                  id="archetype-tooltip"
                   initial={{ opacity: 0, scale: 0.95, y: -10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: -10 }}
@@ -659,12 +668,12 @@ export default function ArchetypeReveal(): JSX.Element {
                     <button
                       onClick={() => setShowTooltip(false)}
                       className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1 hover:bg-white/10 rounded-md transition-colors"
-                      aria-label="Close tooltip"
+                      aria-label={t("closeTooltipAriaLabel")}
                     >
-                      <X className="w-4 h-4 sm:w-5 sm:h-5 text-white/60 hover:text-white" />
+                      <X className="w-4 h-4 sm:w-5 sm:h-5 text-white/80 hover:text-white" />
                     </button>
                     <p className="text-xs sm:text-sm text-gray-200 leading-relaxed pr-6">
-                      <span className="font-semibold text-white">Archetype Rule:</span> {data.description}
+                      <span className="font-semibold text-white">{t("archetypeRuleLabel")}</span> {data.description}
                     </p>
                   </div>
                 </motion.div>
@@ -689,7 +698,9 @@ export default function ArchetypeReveal(): JSX.Element {
 
           {/* Persona evolution timeline */}
           <div className="relative z-10 w-full mt-8">
-            <PersonaEvolutionTimeline useDemo={process.env.NODE_ENV === "development"} />
+            <Suspense fallback={<div className="h-32 rounded-2xl bg-white/5 animate-pulse" aria-hidden="true" />}>
+              <PersonaEvolutionTimeline useDemo={process.env.NODE_ENV === "development"} />
+            </Suspense>
           </div>
 
           {/* Persona rarity / archetype comparison */}
@@ -700,7 +711,26 @@ export default function ArchetypeReveal(): JSX.Element {
               animate={{ opacity: 1 }}
               transition={{ delay: 1.4 }}
             >
-              <PersonaRarityChart userArchetype={archetypeKey} />
+              <Suspense fallback={<div className="h-48 rounded-2xl bg-white/5 animate-pulse" aria-hidden="true" />}>
+                <PersonaRarityChart userArchetype={archetypeKey} />
+              </Suspense>
+            </motion.div>
+          )}
+
+          {/* Asset List - wallet holdings */}
+          {isFlipped && (
+            <motion.div
+              className="relative z-10 w-full mt-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.6 }}
+            >
+              <AssetList showSelection={false} />
+              
+              {/* CSV Export Button */}
+              <div className="mt-4 flex justify-center">
+                <CsvExportButton />
+              </div>
             </motion.div>
           )}
 
@@ -731,11 +761,15 @@ export default function ArchetypeReveal(): JSX.Element {
                     transition={{ duration: 0.2 }}
                     /* Added items-center to center buttons and py-6 for vertical padding */ className="absolute bottom-18 left-0 w-[200px] h-[350px] bg-[#060607] border border-[#232325] rounded-2xl shadow-2xl p-2 z-50 flex flex-col items-center justify-center gap-2"
                     style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.8)" }}
+                    role="menu"
+                    aria-label="Share this wrap"
                   >
                     {" "}
                     {/* X / Twitter */}{" "}
                     <button
                       onClick={() => handleShare("x")}
+                      role="menuitem"
+                      className="flex items-center cursor-pointer justify-center gap-3 p-2 w-42 h-15 rounded-xl bg-[#0F0F10] hover:bg-[#1a1a1c] transition-colors"
                     >
                       {" "}
                       <div className="flex items-center gap-3 relative left-5">
@@ -824,6 +858,7 @@ export default function ArchetypeReveal(): JSX.Element {
                 onKeyDown={toggleShareKeyDown}
                 className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full border border-white/10 bg-black/60 text-white backdrop-blur-md transition hover:bg-white/5"
                 aria-expanded={shareOpen}
+                aria-haspopup="menu"
                 aria-label="Share this wrap"
               >
                 <motion.div
@@ -850,12 +885,12 @@ export default function ArchetypeReveal(): JSX.Element {
               data-testid="persona-stellar-expert-link"
             >
               <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-              View history on Stellar.expert
+              {t("viewHistoryLink")}
             </a>
           )}
 
           {/* Skip/Next Button - Absolute positioned like share page */}
-          <Link href="/share" aria-label="Go to share step">
+          <Link href="/share" aria-label={t("goToShareAriaLabel")}>
             <motion.button
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -864,7 +899,7 @@ export default function ArchetypeReveal(): JSX.Element {
                 }
               }}
               className="absolute bottom-6 right-6 md:bottom-8 md:right-8 z-30 group"
-              aria-label="Go to share step"
+              aria-label={t("goToShareAriaLabel")}
               initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={reducedMotionTransition(prefersReducedMotion, {

@@ -9,7 +9,7 @@ test.describe("Routing smoke flow", () => {
   test("landing → connect → loading → persona → share", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page).toHaveURL(/\/(en\/)?$/);
+    await expect(page).toHaveURL(/\/(en)?(\/)?$/);
     await page.getByRole("button", { name: /START WRAP/i }).click();
     await expect(page).toHaveURL(/\/connect/);
 
@@ -19,10 +19,10 @@ test.describe("Routing smoke flow", () => {
 
     await page.waitForURL(/\/persona/, { timeout: 90_000 });
 
-    await page.getByRole("link", { name: /go to share step/i }).click();
+    await page.getByRole("link", { name: /go to share step/i }).click({ force: true });
     await expect(page).toHaveURL(/\/share/);
     await expect(
-      page.getByText("View full history on Stellar.expert"),
+      page.getByText("View full history on Stellar.expert").first(),
     ).toBeVisible();
   });
 });

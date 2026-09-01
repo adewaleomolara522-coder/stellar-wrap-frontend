@@ -2,9 +2,15 @@ export function generateShareText(
   transactions: number | string,
   persona: string,
   vibePercentage: number | string,
-  topVibe: string
+  topVibe: string,
+  locale: string = "en",
 ): string {
-  return `Check out my Stellar Wrapped 2026! ${transactions} transactions, ${persona} persona, ${vibePercentage}% ${topVibe}! 🎉 #StellarWrapped`;
+  const templates: Record<string, string> = {
+    en: `Check out my Stellar Wrapped 2026! ${transactions} transactions, ${persona} persona, ${vibePercentage}% ${topVibe}! 🎉 #StellarWrapped`,
+    es: `¡Mira mi Stellar Wrapped 2026! ¡${transactions} transacciones, personalidad ${persona}, ${vibePercentage}% ${topVibe}! 🎉 #StellarWrapped`,
+    fr: `Découvrez mon Stellar Wrapped 2026 ! ${transactions} transactions, personnalité ${persona}, ${vibePercentage}% ${topVibe} ! 🎉 #StellarWrapped`,
+  };
+  return templates[locale] ?? templates.en;
 }
 
 export function generatePlatformShareUrl(platform: string, url: string, text: string): string {

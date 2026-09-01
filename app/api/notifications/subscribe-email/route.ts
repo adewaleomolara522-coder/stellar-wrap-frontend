@@ -8,6 +8,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kvGet, kvSet, SUB_KEY } from "../_lib/kv";
 import { sendEmail } from "../_lib/email";
+import { logger } from "@/app/utils/logger";
+
+const log = logger.child("api:subscribe-email");
+import {
+  getClientIp,
+  checkRateLimit,
+  rateLimitResponse,
+  SUBSCRIBE_EMAIL_IP_LIMIT,
+  SUBSCRIBE_EMAIL_IP_WINDOW,
+  SUBSCRIBE_EMAIL_TARGET_LIMIT,
+  SUBSCRIBE_EMAIL_TARGET_WINDOW,
+} from "../_lib/rateLimit";
 import { isValidEmail } from "@/app/utils/notifications/emailValidator";
 import { generateUnsubscribeToken } from "@/app/utils/notifications/unsubscribeToken";
 import type { SubscriptionRecord, PeriodPrefs } from "@/app/types/notifications";
@@ -18,6 +30,17 @@ function isValidWallet(address: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const ipLimitResult = await checkRateLimit(
+      `ratelimit:ip:subscribe-email:${ip}`,
+      SUBSCRIBE_EMAIL_IP_LIMIT,
+      SUBSCRIBE_EMAIL_IP_WINDOW,
+    );
+
+    if (!ipLimitResult.allowed) {
+      return rateLimitResponse(ipLimitResult.resetInSeconds);
+    }
+
     const body = await request.json();
     const { walletAddress, email, periods } = body as {
       walletAddress: string;
@@ -33,9 +56,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
-    const confirmationToken = generateUnsubscribeToken();
-    const unsubscribeToken = generateUnsubscribeToken();
-    const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const emailLimitResult = await checkRateLimit(
+      `ratelimit:email:subscribe-email:${normalizedEmail}`,
+      SUBSCRIBE_EMAIL_TARGET_LIMIT,
+      SUBSCRIBE_EMAIL_TARGET_WINDOW,
+    );
+
+    if (!emailLimitResult.allowed) {
+      return rateLimitResponse(
+        emailLimitResult.resetInSeconds,
+        "Too many requests for this email address. Please try again later.",
+      );
+    }
 
     const existing = (await kvGet<SubscriptionRecord>(SUB_KEY(walletAddress))) ?? {
       walletAddress,
@@ -43,35 +77,53 @@ export async function POST(request: NextRequest) {
       consentTimestamp: new Date().toISOString(),
     };
 
+    const isSameEmail = existing.email?.address?.trim().toLowerCase() === normalizedEmail;
+    const isAlreadyActive = isSameEmail && existing.email?.status === "active";
+
+    const confirmationToken = isSameEmail && existing.email?.confirmationToken
+      ? existing.email.confirmationToken
+      : generateUnsubscribeToken();
+
+    const unsubscribeToken = isSameEmail && existing.email?.unsubscribeToken
+      ? existing.email.unsubscribeToken
+      : generateUnsubscribeToken();
+
+    const status = isAlreadyActive ? "active" : "pending";
+
     const updated: SubscriptionRecord = {
       ...existing,
       email: {
-        address: email,
-        status: "pending",
+        address: normalizedEmail,
+        status,
         confirmationToken,
         unsubscribeToken,
         periods: periods ?? { weekly: false, monthly: false, yearly: false },
-        createdAt: new Date().toISOString(),
+        createdAt: isSameEmail && existing.email?.createdAt
+          ? existing.email.createdAt
+          : new Date().toISOString(),
       },
     };
 
     await kvSet(SUB_KEY(walletAddress), updated);
 
-    const confirmUrl = `${baseUrl}/api/notifications/confirm-email?token=${confirmationToken}&wallet=${walletAddress}`;
+    if (!isAlreadyActive) {
+      const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+      const confirmUrl = `${baseUrl}/api/notifications/confirm-email?token=${confirmationToken}&wallet=${walletAddress}`;
 
-    await sendEmail({
-      to: email,
-      subject: "Confirm your Stellar Wrapped notifications",
-      html: `
-        <p>Click the link below to confirm your email subscription to Stellar Wrapped notifications:</p>
-        <p><a href="${confirmUrl}">Confirm subscription</a></p>
-        <p>If you did not request this, you can ignore this email.</p>
-      `,
-    });
+      await sendEmail({
+        to: normalizedEmail,
+        subject: "Confirm your Stellar Wrapped notifications",
+        html: `
+          <p>Click the link below to confirm your email subscription to Stellar Wrapped notifications:</p>
+          <p><a href="${confirmUrl}">Confirm subscription</a></p>
+          <p>If you did not request this, you can ignore this email.</p>
+        `,
+      });
+    }
 
-    return NextResponse.json({ ok: true, status: "pending" }, { status: 200 });
+    return NextResponse.json({ ok: true, status }, { status: 200 });
   } catch (err) {
-    console.error("[POST /api/notifications/subscribe-email]", err);
+    log.error("Internal error creating email subscription:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
